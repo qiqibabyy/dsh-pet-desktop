@@ -149,7 +149,10 @@ const $ = (id) => document.getElementById(id)
 const float = $('float'), sprite = $('sprite'), spriteWrap = $('spriteWrap'), bubbles = $('bubbles'), panelHost = $('panelHost')
 
 let def = null, snap = null, feedback = null, hideTimer = 0
-let hovered = false, renaming = false, nameDraft = '', peek = false, pinned = false, hiddenUI = false
+let renaming = false, nameDraft = '', peek = false, pinned = false, hiddenUI = false
+// tapped=真实点过她（互动栏唯一开关：路过/悬停不算，不互动就什么都不显示）。
+// 智能穿透的贴合信号走 pet-hover IPC（主进程临时换响应性，右键菜单永远可达）。
+let tapped = false
 let imageReady = false, spriteH = 160, bubbleScale = 1, decoDataUrl = null
 const frame = { track: null, index: 0, elapsed: 0 }
 // 屏边适配：WIN_W 与主进程 WIN_WIDTH 一致；geo 由主进程 pet-geo 推送。
@@ -316,7 +319,7 @@ function renderBubbles() {
 /* ---- 悬停面板（同款 DOM：两行数值 + 动作/改名行） ---- */
 function renderPanel() {
   panelHost.innerHTML = ''
-  if (!hovered || !snap || hiddenUI || renaming === 'pending') return
+  if (!tapped || !snap || hiddenUI || renaming === 'pending') return // 只点不碰才弹卡；路过/静止一律清爽
   const panel = document.createElement('div')
   panel.className = 'panel'
   panel.onpointerenter = () => clearTimeout(hideTimer)
@@ -331,7 +334,7 @@ function renderPanel() {
     const input = document.createElement('input')
     input.className = 'nameInput'; input.value = nameDraft; input.maxLength = 20; input.placeholder = '输入新名字'
     const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'action'; ok.textContent = '确定'
-    const commit = () => { const v = input.value.trim(); if (v) ipcRenderer.invoke('pet-call', '/api/desktop-pet/set-name', { name: v }); renaming = false; hovered = false; render() }
+    const commit = () => { const v = input.value.trim(); if (v) ipcRenderer.invoke('pet-call', '/api/desktop-pet/set-name', { name: v }); renaming = false; tapped = false; render() }
     ok.onclick = commit
     input.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.nativeEvent.isComposing) commit(); if (e.key === 'Escape') { renaming = false; render() } }
     rr.append(input, ok); panel.appendChild(rr)
@@ -345,7 +348,7 @@ function renderPanel() {
         if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'feed' })
       }),
       mk('改名', () => { nameDraft = snap.name ?? ''; renaming = true; clearTimeout(hideTimer); render() }),
-      mk('隐藏', () => { hovered = false; ipcRenderer.send('pet-self-hide') }),
+      mk('隐藏', () => { tapped = false; ipcRenderer.send('pet-self-hide') }),
     )
     panel.appendChild(actions)
   }
@@ -455,6 +458,7 @@ function endDrag(interactIfBare) {
   drag = null
   requestAnimationFrame(updateShape)
   if (moved < 5 && interactIfBare) {
+    tapped = true; renderPanel(); updateShape() // 轻点=互动：此时才亮出互动栏/名字/亲密度
     ipcRenderer.invoke('pet-call', '/api/desktop-pet/interact', { kind: 'pet' })
       .then(r => { if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'pet' }) }).catch(() => {})
   } else {
@@ -466,7 +470,7 @@ sprite.addEventListener('pointerdown', (e) => {
   try { sprite.setPointerCapture?.(e.pointerId) } catch { /* noop */ }
   drag = { x: e.screenX, y: e.screenY, moved: 0 }
   sprite.style.cursor = 'grabbing'
-  hovered = false; renderPanel(); updateShape()
+  tapped = false; renderPanel(); updateShape()
   e.preventDefault()
   ipcRenderer.send('pet-drag-start')
 })
@@ -490,12 +494,15 @@ function setFeedback(fb) {
   hideTimer = setTimeout(() => { feedback = null; renderBubbles(); updateShape() }, 2600)
   renderBubbles()
 }
-spriteWrap.addEventListener('pointerenter', () => { clearTimeout(hideTimer); hovered = true; renderPanel(); updateShape() })
+// 智能穿透的信号源：光标进/出精灵 → 主进程临时恢复/重发穿透（右键菜单永远可达）。
+// 注意穿透开着时这里不能顺带 renderPanel：forward 的 enter 是"路过"，不算互动。
+spriteWrap.addEventListener('pointerenter', () => { clearTimeout(hideTimer); ipcRenderer.send('pet-hover', true) })
 addEventListener('pointerleave', () => {
   const next = event.relatedTarget
   if (next instanceof Node && (spriteWrap.contains(next) || panelHost.contains(next) || bubbles.contains(next))) return
+  ipcRenderer.send('pet-hover', false)
   clearTimeout(hideTimer)
-  hideTimer = setTimeout(() => { if (renaming !== true) { hovered = false; renderPanel(); updateShape() } }, 300)
+  hideTimer = setTimeout(() => { if (renaming !== true) { tapped = false; renderPanel(); updateShape() } }, 300)
 })
 addEventListener('wheel', (e) => { if (drag) return; ipcRenderer.send('pet-wheel', e.deltaY); e.preventDefault() }, { passive: false })
 addEventListener('contextmenu', (e) => { e.preventDefault(); ipcRenderer.send('pet-menu') })

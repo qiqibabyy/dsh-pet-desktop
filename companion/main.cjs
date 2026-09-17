@@ -105,6 +105,8 @@ let lastDecoId = null
 let spriteH = 0
 let cellRatio = 192 / 208 // 精灵绘制宽/高比，来自当前宠物 cell
 let dragging = false
+let hoverIn = false
+let menuOpen = false
 let lastDragEndAt = 0
 
 function bubbleScaleFor(display) {
@@ -188,7 +190,13 @@ async function poll() {
 }
 
 function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-saver') }
-function applyClickThrough() { if (win) win.setIgnoreMouseEvents(!!settings.clickThrough, { forward: true }) }
+// 智能穿透：开着穿透时，光标碰到精灵 / 拖拽中 / 菜单打开 → 临时恢复真实响应，
+// 三者都离开后自动回到穿透。右键菜单因此永远可达——不存在"开了穿透救不回来"。
+function applyClickThrough() {
+  if (!win) return
+  const live = settings.clickThrough && !hoverIn && !dragging && !menuOpen
+  win.setIgnoreMouseEvents(live, { forward: true })
+}
 
 // 屏边适配：
 //   · x：允许窗口探出屏边（贴边翻转由渲染层完成），下限保证精灵+8px 在屏内。
@@ -265,6 +273,8 @@ function createWindow() {
   win.webContents.on('ipc-message', (_e, channel, arg) => { if (channel === 'pet-debug') console.log('[debug] ' + JSON.stringify(arg)) })
   win.webContents.on('did-fail-load', (_e, c, d) => console.log('[win] did-fail-load: ' + c + ' ' + d))
   win.on('closed', () => { win = null })
+  win.on('menu-will-show', () => { menuOpen = true })
+  win.on('menu-will-close', () => { menuOpen = false; applyClickThrough() })
   win.webContents.once('did-finish-load', () => {
     if (!win) return
     win.webContents.send('pet-hidden', settings.hidden)
@@ -273,10 +283,12 @@ function createWindow() {
 }
 
 ipcMain.on('pet-menu', () => { if (win) buildMenu().popup({ window: win }) })
+// 光标与精灵的贴合状态（渲染层按真实指针位置上报，穿透模式下 forward 的 move 也算）。
+ipcMain.on('pet-hover', (_e, v) => { hoverIn = !!v; applyClickThrough() })
 // 拖拽 = 光标 1:1 + 触边吸附(snap)：窗口被钳制顶回的那一刻本次手势即告结束
 // （渲染层收到 force-end 后收尾），之后光标随便怎么回收/甩动都和她无关——
 // 这是桌宠贴边的标准语义，触控板"拖一段回一段"的场景下不会发生任何回沉。
-ipcMain.on('pet-drag-start', () => { dragging = true })
+ipcMain.on('pet-drag-start', () => { dragging = true; applyClickThrough() })
 ipcMain.on('pet-drag', (_e, dx, dy) => {
   if (!win || !dragging) return
   const b = win.getBounds()
@@ -299,13 +311,14 @@ ipcMain.on('pet-drag', (_e, dx, dy) => {
   }
   win.setPosition(x, y)
   pushGeo(x, y, wa)
-  if (hitEdge) win.webContents.send('pet-drag-force-end')
+  if (hitEdge) { win.webContents.send('pet-drag-force-end'); applyClickThrough() }
 })
 ipcMain.on('pet-drag-end', () => {
   if (!dragging) return
   dragging = false
   lastDragEndAt = Date.now()
   if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() }
+  applyClickThrough()
 })
 // 拖拽后短冷却：触控板手势尾部会误触发滚轮事件，别让它改 zoom。
 ipcMain.on('pet-wheel', (_e, delta) => {
