@@ -150,9 +150,12 @@ async function poll() {
 function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-saver') }
 function applyClickThrough() { if (win) win.setIgnoreMouseEvents(!!settings.clickThrough, { forward: true }) }
 
-// 屏边适配：窗口可以探出屏外（让精灵本体贴边），但保证
-//   · 至少 360px 窗口可见（渲染层平移内容层后气泡最宽 504 也能留在屏内）
-//   · y 轴整窗收进工作区（上方 300px 是气泡预留带，绝不能出屏）
+// 屏边适配：
+//   · x：窗口可探出左右屏边（渲染层把内容平移保气泡在屏内），但保证
+//     至少 360px 可见（最宽 504 的气泡平移后仍在屏内）。
+//   · y：约束「精灵+面板」带（窗口底部 spriteH+178）完整在屏内；
+//     顶部 300px 气泡预留带允许探出——无气泡时它是透明垫层，
+//     若强约束整窗会把精灵永远卡在屏幕中线以下。
 // 用 getDisplayMatching，多屏拖到副屏不会被主屏拽回。
 // 每次落位后把「窗口可见横区间」推给渲染层算平移量。
 function clampToScreen() {
@@ -160,7 +163,8 @@ function clampToScreen() {
   const b = win.getBounds()
   const wa = screen.getDisplayMatching(b).workArea
   const x = Math.max(wa.x - (WIN_WIDTH - 360), Math.min(b.x, wa.x + wa.width - 360))
-  const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - b.height))
+  // 精灵顶/底边 = y+302 / y+302+spriteH（#float bottom:178，窗高=300+spriteH+180）。
+  const y = Math.max(wa.y - (BUB_RESERVE - 24), Math.min(b.y, wa.y + wa.height - BUB_RESERVE - spriteH - 4))
   if (x !== b.x || y !== b.y) win.setBounds({ ...b, x, y })
   win.webContents.send('pet-geo', {
     visL: Math.max(0, wa.x - x),
