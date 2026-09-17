@@ -300,9 +300,11 @@ export class PetLedger {
  * the only clock driver.
  */
 export class DesktopPetService {
-  constructor({ registry, file = path.join(dshHome(), 'desktop-pet.json') }) {
+  constructor({ registry, file = path.join(dshHome(), 'desktop-pet.json'), getPort }) {
     this.registry = registry
     this.ledger = new PetLedger(file)
+    this.getPort = typeof getPort === 'function' ? getPort : () => 0
+    this.usageExt = { totals: null, day: '', at: 0, attemptAt: 0 }
     this.sessions = new Map() // sessionId -> {sid, act, lastAt} — insertion order = recency (tail newest)
     this.voice = new StatusVoice()
     this.whispers = new WhisperEngine()
@@ -457,6 +459,43 @@ export class DesktopPetService {
     return decoId ? this.registry.decorations.get(decoId) : this.registry.getDecoration(this.registry.defaultDecorationId())
   }
 
+  /**
+   * Daily token display: the dsh-usage ledger wins when installed (it has
+   * been counting since midnight and owns the billing convention); this
+   * plugin's own observed bucket is the fallback. The external fetch is a
+   * background refresh at a 15 s floor — renderers always get whatever is
+   * fresh, never block on the probe, and nothing here depends on dsh-usage
+   * existing (404/error just keeps the local numbers showing).
+   */
+  refreshUsage(now = Date.now()) {
+    const e = this.usageExt
+    const port = this.getPort()
+    if (!port) return
+    if (e.day === localDateKey(now) && now - e.at < 15_000) return
+    if (now - e.attemptAt < 15_000) return
+    e.attemptAt = now
+    fetch(`http://127.0.0.1:${port}/api/dsh-usage/overview`, { signal: AbortSignal.timeout(4000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((o) => {
+        const today = o?.usage?.today
+        if (today && today.totals && typeof today.totals === 'object') { e.totals = today.totals; e.day = today.date ?? ''; e.at = Date.now() }
+      })
+      .catch(() => { /* not installed or transient failure: local bucket keeps serving */ })
+  }
+
+  usageView(now = Date.now()) {
+    this.refreshUsage(now)
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+    const e = this.usageExt
+    if (e.totals && e.day === localDateKey(now) && now - e.at < 60_000) {
+      const t = e.totals
+      const input = num(t.inputTokens), output = num(t.outputTokens), cacheRead = num(t.cacheReadTokens), cacheWrite = num(t.cacheWriteTokens)
+      return { day: e.day, total: input + output + cacheRead + cacheWrite, input, output, cacheRead, cacheWrite, calls: num(t.calls), cost: num(t.cost), source: 'dsh-usage' }
+    }
+    const u = this.ledger.state.usage
+    return { day: u.day, total: u.input + u.output + u.cacheRead + u.cacheWrite, input: u.input, output: u.output, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, calls: u.calls, source: 'local' }
+  }
+
   buildView(now = Date.now(), currentSid) {
     const led = this.ledger
     const pet = this.selectedPet()
@@ -483,7 +522,7 @@ export class DesktopPetService {
       ...(announcement ? { announcement } : {}),
       affinity: led.affinityView(now),
       treats: led.treatView(),
-      usage: led.usageView(),
+      usage: this.usageView(now),
       display: led.state.display,
       pet: pet ? { id: pet.id, displayName: pet.displayName, description: pet.description } : { id: '', displayName: '待领养', description: '把 Codex 宠物目录放进 ~/.codex/pets 或设置「宠物目录」' },
       name: (pet && led.state.names[pet.id]) || pet?.displayName || '桌宠',

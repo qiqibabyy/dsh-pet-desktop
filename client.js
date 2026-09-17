@@ -145,8 +145,8 @@ window.__ModuleLoader__.load({
             ),
           ),
           Row('今日 token 消耗', h('span', { className: 'dsp-chip' },
-            usage ? fmtTok(usage.total) + ' tok · 输入 ' + fmtTok(usage.input) + ' · 输出 ' + fmtTok(usage.output) + ' · 缓存 ' + fmtTok(usage.cacheRead + usage.cacheWrite) + ' · ' + usage.calls + ' 次调用' : '—'),
-            '只统计本插件运行期间观测到的会话调用，本地零点自动归零，重启不丢；账单权威口径见 dsh-usage。'),
+            usage ? fmtTok(usage.total) + ' tok · 输入 ' + fmtTok(usage.input) + ' · 输出 ' + fmtTok(usage.output) + ' · 缓存 ' + fmtTok(usage.cacheRead + usage.cacheWrite) + ' · ' + usage.calls + ' 次调用' + (usage.cost ? ' · ≈¥' + usage.cost.toFixed(2) : '') : '—'),
+            '已装 dsh-usage 时直接取其当日台账（与用量面板同源同口径，≈¥ 为其估算成本）；未安装时显示本插件观测到的调用，本地零点自动归零，重启不丢。'),
           Row('随 harness 自动启动', h(Switch, {
             on: enabled, disabled: !ready || busy, onChange: (v) => act(() => scope.set('enabled', v)),
           }), '摸头 +1、喂食 +5、完成对话 +1；亲密度永不衰减。拖到屏幕边缘会吸附钉住，气泡与卡片自动翻转不被裁切。'),

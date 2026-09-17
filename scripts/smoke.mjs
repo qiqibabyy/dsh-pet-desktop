@@ -147,6 +147,15 @@ try {
   // usage fold rides the same assistant/message event the phase machine uses
   handlers['session/event'](session, { type: 'assistant/message', data: { usage: { inputTokens: 42, outputTokens: 8 } } })
   assert.equal(service.buildView(Date.now()).usage.total, 50, 'assistant/message usage folds into the view')
+  assert.equal(service.buildView(Date.now()).usage.source, 'local', 'no dsh-usage reachable → local observed bucket')
+  // an installed dsh-usage ledger takes precedence over the local bucket
+  const dd = new Date()
+  const todayKey = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`
+  service.usageExt = { totals: { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 500, cacheWriteTokens: 0, calls: 7, cost: 3.5 }, day: todayKey, at: Date.now(), attemptAt: Date.now() }
+  view = service.buildView(Date.now())
+  assert.equal(view.usage.source, 'dsh-usage', 'external ledger wins')
+  assert.equal(view.usage.total, 1700, 'external total = input+output+cacheRead+cacheWrite')
+  assert.equal(view.usage.cost, 3.5, 'cost carried through for the ¥ display')
   handlers['session/disposed'](session)
   view = service.buildView(Date.now())
   assert.equal(view.animation, 'idle')

@@ -66,7 +66,7 @@ export function applyImpl(ctx, config = {}) {
   }
 
   const registry = new PetRegistry(section.petDirs).load()
-  const service = new DesktopPetService({ registry })
+  const service = new DesktopPetService({ registry, getPort: () => ctx.webServer?.port })
   service.enabled = section.enabled
   const supervisor = new CompanionSupervisor({
     companionDir: path.join(dirname, 'companion'),
