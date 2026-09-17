@@ -80,6 +80,7 @@ let lastDecoId = null
 let spriteH = 0
 let cellRatio = 192 / 208 // 精灵绘制宽/高比，来自当前宠物 cell
 let dragging = false
+let lastDragEndAt = 0
 
 function bubbleScaleFor(display) {
   const size = Number.isFinite(display.size) ? display.size : BUBBLE_BASE_SIZE_PX
@@ -258,26 +259,33 @@ ipcMain.on('pet-drag', (_e, dx, dy) => {
   const wa = screen.getDisplayMatching(b).workArea
   const rawX = b.x + Math.round(dx), rawY = b.y + Math.round(dy)
   const [x, y] = clampXY(rawX, rawY, wa)
-  if (x !== rawX || y !== rawY) {
-    // 钳制生效 = 贴边钉死，手势当场结束并落盘。
+  if (x === b.x && y === b.y) {
+    // 已在边上还往边里顶：吸收掉这一帧，手势保持活着——随时可反向拖走。
+    return
+  }
+  // 只有「自由位置 → 撞上边」这一次移动才触发 snap；已经贴着边继续顶不重复触发
+  // （否则重按上顶的第一帧就被钳回原地→误判 snap→手势当场结束→再也拖不动）。
+  const hitEdge = (x !== b.x && x !== rawX) || (y !== b.y && y !== rawY)
+  if (hitEdge) {
+    // 首次撞上边：钉住并结束本手势（贴纸语义），之后光标回收与她无关。
     dragging = false
+    lastDragEndAt = Date.now()
     settings.pos = { x, y }
     saveSettings()
     tl('snap', [b.x, b.y], [x, y])
-    win.setPosition(x, y)
-    pushGeo(x, y, wa)
-    win.webContents.send('pet-drag-force-end')
-    return
   }
   win.setPosition(x, y)
   pushGeo(x, y, wa)
+  if (hitEdge) win.webContents.send('pet-drag-force-end')
 })
 ipcMain.on('pet-drag-end', () => {
   if (!dragging) return
   dragging = false
+  lastDragEndAt = Date.now()
   if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() }
 })
 ipcMain.on('pet-wheel', (_e, delta) => {
+  if (dragging || Date.now() - lastDragEndAt < 500) return // 拖拽中/触控板手势尾部误滚，忽略
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()
   poll()
