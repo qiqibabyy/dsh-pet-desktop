@@ -150,9 +150,8 @@ const float = $('float'), sprite = $('sprite'), spriteWrap = $('spriteWrap'), bu
 
 let def = null, snap = null, feedback = null, hideTimer = 0
 let renaming = false, nameDraft = '', peek = false, pinned = false, hiddenUI = false
-// tapped=真实点过她（互动栏唯一开关：路过/悬停不算，不互动就什么都不显示）。
-// 智能穿透的贴合信号走 pet-hover IPC（主进程临时换响应性，右键菜单永远可达）。
-let tapped = false
+// throughMode=穿透开着：苏醒只为右键菜单服务，左键/滚轮/气泡触碰一律无效。
+let throughMode = false, tapped = false
 let imageReady = false, spriteH = 160, bubbleScale = 1, decoDataUrl = null
 const frame = { track: null, index: 0, elapsed: 0 }
 // 屏边适配：WIN_W 与主进程 WIN_WIDTH 一致；geo 由主进程 pet-geo 推送。
@@ -425,8 +424,7 @@ function updateShape() {
   if (hiddenUI) push($$('summon'), 6)
   else {
     push(spriteWrap, 2)
-    push(bubbles.firstElementChild, 10)
-    push(panelHost.firstElementChild, 10)
+    if (!throughMode) { push(bubbles.firstElementChild, 10); push(panelHost.firstElementChild, 10) } // 穿透态气泡也穿过
   }
   if (rects.length) ipcRenderer.send('pet-shape', rects)
 }
@@ -445,6 +443,9 @@ function ensurePill() {
   pill = document.createElement('button')
   pill.id = 'summon'; pill.className = 'summon'; pill.textContent = '点我召唤桌宠'
   pill.onclick = () => ipcRenderer.send('pet-summon')
+  // 穿透+收起叠加时，药丸也要能唤醒（enter 先于 click 到达）。
+  pill.onpointerenter = () => ipcRenderer.send('pet-hover', true)
+  pill.onpointerleave = () => ipcRenderer.send('pet-hover', false)
   document.body.appendChild(pill)
 }
 function removePill() { if (pill) { pill.remove(); pill = null } }
@@ -467,6 +468,7 @@ function endDrag(interactIfBare) {
 }
 sprite.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return
+  if (throughMode) return // 穿透态：左键穿过/无效，拖不动也摸不到，唯独右键出菜单
   try { sprite.setPointerCapture?.(e.pointerId) } catch { /* noop */ }
   drag = { x: e.screenX, y: e.screenY, moved: 0 }
   sprite.style.cursor = 'grabbing'
@@ -533,6 +535,11 @@ ipcRenderer.on('pet-state', (_e, s) => {
   requestAnimationFrame(updateShape)
 })
 ipcRenderer.on('pet-hidden', (_e, v) => { hiddenUI = !!v; render() })
+ipcRenderer.on('pet-through', (_e, v) => {
+  throughMode = !!v
+  if (throughMode) tapped = false
+  renderPanel(); updateShape()
+})
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && renaming === true) { renaming = false; render() } })
 window.onerror = (m, s, l) => { ipcRenderer.send('pet-debug', { err: String(m).slice(0, 200), at: s + ':' + l }) }
 </script>

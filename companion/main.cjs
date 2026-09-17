@@ -190,12 +190,14 @@ async function poll() {
 }
 
 function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-saver') }
-// 智能穿透：开着穿透时，光标碰到精灵 / 拖拽中 / 菜单打开 → 临时恢复真实响应，
-// 三者都离开后自动回到穿透。右键菜单因此永远可达——不存在"开了穿透救不回来"。
+// 智能穿透：开着穿透时，光标碰到精灵 / 拖拽中 / 菜单打开 → 临时恢复响应，
+// 否则忽略鼠标。恢复响应只为右键服务——渲染层在穿透态吞掉一切左键/滚轮/拖拽，
+// 所以实际效果 = 左键穿过、拖不动、摸不到，唯独右键能开菜单关掉穿透。
 function applyClickThrough() {
   if (!win) return
   const live = settings.clickThrough && !hoverIn && !dragging && !menuOpen
   win.setIgnoreMouseEvents(live, { forward: true })
+  win.webContents.send('pet-through', settings.clickThrough)
 }
 
 // 屏边适配：
@@ -278,6 +280,7 @@ function createWindow() {
   win.webContents.once('did-finish-load', () => {
     if (!win) return
     win.webContents.send('pet-hidden', settings.hidden)
+    win.webContents.send('pet-through', settings.clickThrough)
     clampToScreen() // 补发 pet-geo：构造期那次 renderer 还没监听
   })
 }
@@ -322,6 +325,7 @@ ipcMain.on('pet-drag-end', () => {
 })
 // 拖拽后短冷却：触控板手势尾部会误触发滚轮事件，别让它改 zoom。
 ipcMain.on('pet-wheel', (_e, delta) => {
+  if (settings.clickThrough) return // 穿透态滚轮也无效
   if (dragging || Date.now() - lastDragEndAt < 500) return
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()
