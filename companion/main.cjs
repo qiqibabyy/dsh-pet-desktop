@@ -247,22 +247,33 @@ function createWindow() {
 }
 
 ipcMain.on('pet-menu', () => { if (win) buildMenu().popup({ window: win }) })
-// 拖拽 = 绝对映射（起点 + 指针总位移，钳制后落位）：
-// 指针过冲被钳制吸收，回拉不再把窗口从屏边/屏顶拽下来（"卡边不沉"）。
-let dragBase = null
-ipcMain.on('pet-drag-start', () => { if (win) dragBase = win.getPosition() })
+// 拖拽 = 光标 1:1（按下点始终在精灵附近，指针捕获稳定）+ 贴边余量(slack)：
+// 窗口钉在边沿时把光标过冲计入 slack；回拉先消耗 slack——光标追平窗口前
+// 她纹丝不动，不存在"回抽一下就把她从屏边拽下来"的下沉。
+let slack = null
+function eatSlack(d, s) {
+  if (!d || !s || Math.sign(d) === Math.sign(s)) return 0
+  return Math.sign(d) * Math.min(Math.abs(d), Math.abs(s))
+}
+ipcMain.on('pet-drag-start', () => { slack = [0, 0] })
 ipcMain.on('pet-drag', (_e, dx, dy) => {
-  if (!win || !dragBase) return
+  if (!win) return
+  if (!slack) slack = [0, 0]
   const b = win.getBounds()
   const wa = screen.getDisplayMatching(b).workArea
-  const [x, y] = clampXY(dragBase[0] + Math.round(dx), dragBase[1] + Math.round(dy), wa)
+  const ex = eatSlack(dx, slack[0]); dx -= ex; slack[0] += ex
+  const ey = eatSlack(dy, slack[1]); dy -= ey; slack[1] += ey
+  const rawX = b.x + Math.round(dx), rawY = b.y + Math.round(dy)
+  const [x, y] = clampXY(rawX, rawY, wa)
+  slack[0] += rawX - x
+  slack[1] += rawY - y
   if (x !== b.x || y !== b.y) {
     tl('drag', [b.x, b.y], [x, y])
     win.setPosition(x, y)
   }
   pushGeo(x, y, wa)
 })
-ipcMain.on('pet-drag-end', () => { dragBase = null; if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
+ipcMain.on('pet-drag-end', () => { slack = null; if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
 ipcMain.on('pet-wheel', (_e, delta) => {
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()

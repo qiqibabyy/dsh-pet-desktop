@@ -403,6 +403,12 @@ function applyEdge() {
 
 function updateShape() {
   applyEdge()
+  // 拖拽中命中区放宽为整窗：贴边钉住后光标会滑出精灵形状，形状裁剪会吞掉
+  // 事件（丢 up = 幽灵拖拽）。整窗兜底 + lostpointercapture 双保险。
+  if (drag) {
+    ipcRenderer.send('pet-shape', [{ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }])
+    return
+  }
   const rects = []
   const push = (el, pad) => {
     if (!el) return
@@ -442,10 +448,23 @@ function removePill() { if (pill) { pill.remove(); pill = null } }
 
 /* ---- 交互：拖精灵=移窗；点击=摸一摸（反馈气泡）；滚轮缩放；右键菜单 ---- */
 let drag = null
+function endDrag(interactIfBare) {
+  if (!drag) return
+  sprite.style.cursor = 'grab'
+  const moved = drag.moved
+  drag = null
+  requestAnimationFrame(updateShape)
+  if (moved < 5 && interactIfBare) {
+    ipcRenderer.invoke('pet-call', '/api/desktop-pet/interact', { kind: 'pet' })
+      .then(r => { if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'pet' }) }).catch(() => {})
+  } else {
+    ipcRenderer.send('pet-drag-end')
+  }
+}
 sprite.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return
-  sprite.setPointerCapture?.(e.pointerId)
-  drag = { x: e.screenX, y: e.screenY, lx: e.screenX, ly: e.screenY, moved: 0 }
+  try { sprite.setPointerCapture?.(e.pointerId) } catch { /* noop */ }
+  drag = { x: e.screenX, y: e.screenY, moved: 0 }
   sprite.style.cursor = 'grabbing'
   hovered = false; renderPanel(); updateShape()
   e.preventDefault()
@@ -453,24 +472,14 @@ sprite.addEventListener('pointerdown', (e) => {
 })
 addEventListener('pointermove', (e) => {
   if (!drag) return
-  drag.moved += Math.abs(e.screenX - drag.lx) + Math.abs(e.screenY - drag.ly)
-  drag.lx = e.screenX; drag.ly = e.screenY
   const dx = e.screenX - drag.x, dy = e.screenY - drag.y
-  if (dx || dy) ipcRenderer.send('pet-drag', dx, dy)
+  drag.moved += Math.abs(dx) + Math.abs(dy)
+  if (dx || dy) { ipcRenderer.send('pet-drag', dx, dy); drag.x = e.screenX; drag.y = e.screenY }
 })
-addEventListener('pointerup', async () => {
-  if (!drag) return
-  sprite.style.cursor = 'grab'
-  if (drag.moved < 5) {
-    try {
-      const r = await ipcRenderer.invoke('pet-call', '/api/desktop-pet/interact', { kind: 'pet' })
-      if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'pet' })
-    } catch { /* host 不在 */ }
-  } else {
-    ipcRenderer.send('pet-drag-end')
-  }
-  drag = null
-})
+addEventListener('pointerup', () => endDrag(true))
+// 捕获丢失（指针滑出窗口/系统抢走）→ 必须立刻结束手势，否则留下幽灵拖拽。
+sprite.addEventListener('lostpointercapture', () => endDrag(false))
+addEventListener('pointercancel', () => endDrag(false))
 function setFeedback(fb) {
   feedback = fb
   clearTimeout(hideTimer)
