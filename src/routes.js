@@ -121,23 +121,28 @@ export function makeDesktopPetRoutes(service, registry, supervisor) {
     { ...json('POST', (b) => service.announce(b)), path: '/api/desktop-pet/announce' },
     // 伴生窗口的可读写标志（置顶/穿透/隐藏/缩放）。文件由伴生进程与本页共享：
     // 这里只做「读-合并-写」，绝不动 pos（伴生进程独占）。
+    // 注意：webServer 的 exact 路由按「路径」去重、不分方法，所以 GET/POST 必须
+    // 合成同一条路由内部按 req.method 分派——分两条会触发 duplicate exact route，
+    // 让整个插件在 apply 阶段崩掉。
     {
-      ...json('GET', () => ({ ok: true, window: readWindowFlags() })),
+      kind: 'exact',
       path: '/api/desktop-pet/window',
-    },
-    {
-      ...json('POST', (b) => {
-        const patch = {}
-        if (typeof b?.topmost === 'boolean') patch.topmost = b.topmost
-        if (typeof b?.clickThrough === 'boolean') patch.clickThrough = b.clickThrough
-        if (typeof b?.hidden === 'boolean') patch.hidden = b.hidden
-        if (Number.isFinite(b?.zoom)) patch.zoom = Math.min(3.2, Math.max(0.4, b.zoom))
-        if (!Object.keys(patch).length) return { ok: false, error: 'no-valid-fields', window: readWindowFlags() }
-        const merged = { ...readWindowRaw(), ...patch }
-        writeFileSync(path.join(runtimeDir(), 'desktop-pet-window.json'), JSON.stringify(merged))
-        return { ok: true, window: readWindowFlags() }
-      }),
-      path: '/api/desktop-pet/window',
+      handler: (req, res) => {
+        if (!isLoopback(req)) return writeJson(res, 403, { ok: false, error: 'forbidden: loopback-only' })
+        if (req.method === 'GET') return writeJson(res, 200, { ok: true, window: readWindowFlags() })
+        if (req.method !== 'POST') return writeJson(res, 405, { ok: false, error: 'method-not-allowed' })
+        readBody(req).then((b) => {
+          const patch = {}
+          if (typeof b?.topmost === 'boolean') patch.topmost = b.topmost
+          if (typeof b?.clickThrough === 'boolean') patch.clickThrough = b.clickThrough
+          if (typeof b?.hidden === 'boolean') patch.hidden = b.hidden
+          if (Number.isFinite(b?.zoom)) patch.zoom = Math.min(3.2, Math.max(0.4, b.zoom))
+          if (!Object.keys(patch).length) return writeJson(res, 200, { ok: false, error: 'no-valid-fields', window: readWindowFlags() })
+          const merged = { ...readWindowRaw(), ...patch }
+          writeFileSync(path.join(runtimeDir(), 'desktop-pet-window.json'), JSON.stringify(merged))
+          return writeJson(res, 200, { ok: true, window: readWindowFlags() })
+        }, (error) => writeJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) }))
+      },
     },
   ]
 
