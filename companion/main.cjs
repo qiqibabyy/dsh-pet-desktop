@@ -78,6 +78,7 @@ let pollTimer = null
 let lastPetId = null
 let lastDecoId = null
 let spriteH = 0
+let cellRatio = 192 / 208 // 精灵绘制宽/高比，来自当前宠物 cell
 
 function bubbleScaleFor(display) {
   const size = Number.isFinite(display.size) ? display.size : BUBBLE_BASE_SIZE_PX
@@ -102,6 +103,7 @@ async function poll() {
       const def = defs.find(d => d.id === petId)
       if (!def || def.renderer !== 'sprite2d') return
       def.rowsIndex = Object.fromEntries(ROW_ORDER.map((name, i) => [name, i]))
+      if (def.cell && def.cell.height > 0) cellRatio = def.cell.width / def.cell.height
       // file:// 渲染页加载 http:// 子资源会被拦，图集与装饰图统一走主进程 data URL。
       const bytes = await request('GET', def.atlasUrl)
       def.atlasDataUrl = 'data:image/webp;base64,' + bytes.toString('base64')
@@ -151,25 +153,46 @@ function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-
 function applyClickThrough() { if (win) win.setIgnoreMouseEvents(!!settings.clickThrough, { forward: true }) }
 
 // 屏边适配：
-//   · x：窗口可探出左右屏边（渲染层把内容平移保气泡在屏内），但保证
-//     至少 360px 可见（最宽 504 的气泡平移后仍在屏内）。
-//   · y：约束「精灵+面板」带（窗口底部 spriteH+178）完整在屏内；
-//     顶部 300px 气泡预留带允许探出——无气泡时它是透明垫层，
-//     若强约束整窗会把精灵永远卡在屏幕中线以下。
+//   · x：允许窗口探出屏边（贴边翻转由渲染层完成），下限保证精灵+8px 在屏内。
+//   · y：精灵带必须完整在屏内；顶部预留带允许探出 160px（保留 140px 气泡空间）。
+//   · 落位后推 pet-geo：窗口坐标系里「在屏内」的横区间，渲染层据此翻转气泡锚点。
 // 用 getDisplayMatching，多屏拖到副屏不会被主屏拽回。
-// 每次落位后把「窗口可见横区间」推给渲染层算平移量。
+function clampXY(nx, ny, wa) {
+  const spW = Math.round(spriteH * cellRatio)
+  return [
+    Math.max(wa.x - (WIN_WIDTH - spW - 8), Math.min(nx, wa.x + wa.width - spW - 8)),
+    Math.max(wa.y - (BUB_RESERVE - 8), Math.min(ny, wa.y + wa.height - BUB_RESERVE - spriteH - 4)),
+  ]
+}
+function pushGeo(x, y, wa) {
+  if (!win) return
+  win.webContents.send('pet-geo', {
+    visL: Math.max(0, wa.x - x),
+    visR: Math.min(WIN_WIDTH, wa.x + wa.width - x),
+    topOff: Math.max(0, wa.y - y),
+  })
+}
 function clampToScreen() {
   if (!win) return
   const b = win.getBounds()
   const wa = screen.getDisplayMatching(b).workArea
-  const x = Math.max(wa.x - (WIN_WIDTH - 360), Math.min(b.x, wa.x + wa.width - 360))
-  // 精灵顶/底边 = y+302 / y+302+spriteH（#float bottom:178，窗高=300+spriteH+180）。
-  const y = Math.max(wa.y - (BUB_RESERVE - 24), Math.min(b.y, wa.y + wa.height - BUB_RESERVE - spriteH - 4))
-  if (x !== b.x || y !== b.y) win.setBounds({ ...b, x, y })
-  win.webContents.send('pet-geo', {
-    visL: Math.max(0, wa.x - x),
-    visR: Math.min(WIN_WIDTH, wa.x + wa.width - x),
-  })
+  const [x, y] = clampXY(b.x, b.y, wa)
+  if (x !== b.x || y !== b.y) {
+    tl('clamp', [b.x, b.y], [x, y])
+    win.setBounds({ ...b, x, y })
+  }
+  pushGeo(x, y, wa)
+}
+
+// TEMP telemetry for edge-adaptation debugging — drop after acceptance.
+let tlLast = 0
+function tl(kind, a, c) {
+  try {
+    const now = Date.now()
+    if (now - tlLast < 120) return
+    tlLast = now
+    fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: now, kind, a, c }) + '\n')
+  } catch { /* noop */ }
 }
 
 function buildMenu() {
@@ -224,13 +247,22 @@ function createWindow() {
 }
 
 ipcMain.on('pet-menu', () => { if (win) buildMenu().popup({ window: win }) })
+// 拖拽 = 绝对映射（起点 + 指针总位移，钳制后落位）：
+// 指针过冲被钳制吸收，回拉不再把窗口从屏边/屏顶拽下来（"卡边不沉"）。
+let dragBase = null
+ipcMain.on('pet-drag-start', () => { if (win) dragBase = win.getPosition() })
 ipcMain.on('pet-drag', (_e, dx, dy) => {
-  if (!win) return
-  const [x, y] = win.getPosition()
-  win.setPosition(x + Math.round(dx), y + Math.round(dy))
-  clampToScreen()
+  if (!win || !dragBase) return
+  const b = win.getBounds()
+  const wa = screen.getDisplayMatching(b).workArea
+  const [x, y] = clampXY(dragBase[0] + Math.round(dx), dragBase[1] + Math.round(dy), wa)
+  if (x !== b.x || y !== b.y) {
+    tl('drag', [b.x, b.y], [x, y])
+    win.setPosition(x, y)
+  }
+  pushGeo(x, y, wa)
 })
-ipcMain.on('pet-drag-end', () => { if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
+ipcMain.on('pet-drag-end', () => { dragBase = null; if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
 ipcMain.on('pet-wheel', (_e, delta) => {
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()

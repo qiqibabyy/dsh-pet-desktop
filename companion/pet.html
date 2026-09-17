@@ -10,19 +10,22 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 #float {
-  position: absolute; left: 50%; bottom: 178px; transform: translateX(calc(-50% + var(--edge-shift, 0px)));
+  position: absolute; left: 50%; bottom: 178px; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center;
   user-select: none; -webkit-user-select: none; pointer-events: auto;
 }
+/* 贴边模式：主进程推 pet-geo（窗口内可见横区间），JS 算出锚点后挂类名。
+   edge-* 移动 #float（精灵贴屏边），flip-* 只改气泡栈的伸缩方向。 */
+body.edge-right #float { left: auto; transform: none; right: calc(100vw - var(--anchorR, 532px)); }
+body.edge-left #float { transform: none; right: auto; left: var(--anchorL, 8px); }
 
 /* ===== 以下自 @linxin666/dsh-pet pet.module.css 原样移植 ===== */
 .sprite { image-rendering: auto; touch-action: none; contain: paint; cursor: grab; }
 .spriteWrap { position: relative; flex: 0 0 auto; }
 
 .bubble {
-  position: absolute; bottom: 100%; left: 0; right: 0; margin: 0 auto 6px;
-  width: max-content; max-width: calc(100vw - 48px); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+  position: absolute; bottom: 100%; margin-bottom: 6px; white-space: nowrap;
+  width: max-content; max-width: calc(100vw - 48px); overflow: hidden; text-overflow: ellipsis;
   padding: calc(4px * var(--pet-bubble-scale, 1)) calc(10px * var(--pet-bubble-scale, 1));
   border-radius: 999px; font-size: calc(12px * var(--pet-bubble-scale, 1));
   line-height: 1.4; color: #f4f7ff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -43,10 +46,21 @@ body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 .bubbleWhisper::before { content: '「'; margin-right: 2px; opacity: 0.7; }
 .bubbleWhisper::after { content: '」'; margin-left: 2px; opacity: 0.7; }
 .bubbleStack {
-  position: absolute; bottom: 100%; left: 0; right: 0;
-  width: max-content; max-width: calc(100vw - 48px); margin-inline: auto;
+  position: absolute; bottom: 100%;
+  width: max-content; max-width: calc(100vw - 48px);
   display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: auto;
 }
+/* 气泡层默认绕精灵中心（translate 属性独立于动画 transform，互不打架）。 */
+#bubbles > .bubble, .bubbleStack, .panel { left: 50%; translate: -50% 0; }
+body.flip-right #bubbles > .bubble, body.flip-right .bubbleStack, body.flip-right .panel {
+  left: auto; right: 0; translate: 0 0; max-width: var(--roomR, 500px);
+}
+body.flip-left #bubbles > .bubble, body.flip-left .bubbleStack, body.flip-left .panel {
+  left: 0; right: auto; translate: 0 0; max-width: var(--roomL, 500px);
+}
+/* 精灵贴到屏顶时，气泡翻到脚下（top:100% = 精灵底边，即 #float 下缘）。 */
+body.flip-down #bubbles > .bubble, body.flip-down .bubbleStack { bottom: auto; top: calc(100% + 2px); }
+body.flip-down .panel { top: calc(100% + var(--duck, 48px)); }
 .bubbleAnchor { position: relative; display: inline-flex; }
 .bubbleMore {
   position: absolute; top: -9px; right: -10px; z-index: 1; min-width: 18px; height: 18px; padding: 0 5px;
@@ -65,7 +79,7 @@ body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 @keyframes pet-panel-in { from { opacity: 0; transform: translateY(4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes pet-bubble-pop { 0% { opacity: 0; transform: translateY(6px) scale(0.85); } 15% { opacity: 1; transform: translateY(0) scale(1.05); } 25% { transform: translateY(0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px) scale(0.95); } }
 .panel {
-  position: absolute; top: 100%; left: 0; right: 0; margin: 8px auto 0;
+  position: absolute; top: 100%; margin-top: 8px;
   width: max-content; max-width: calc(100vw - 48px);
   background: linear-gradient(165deg, rgba(19, 28, 54, 0.95), rgba(7, 11, 26, 0.97));
   border: 1px solid rgba(126, 152, 255, 0.3); border-radius: 12px; padding: 10px 12px;
@@ -354,17 +368,41 @@ function renderSprite() {
   })
 }
 
-function updateShape() {
-  // 贴屏适配：把内容层(精灵+最宽气泡/面板整体)平移回可见屏区。
-  // 主进程在拖拽/启动/缩放时推送 geo = 窗口横区间中「在屏内」的部分。
-  let half = (spriteWrap.offsetWidth || 148) / 2
+/* ---- 贴边决策：geo = 主进程推来的窗口内可见横区间 [visL, visR]。
+   精灵锚点向屏边滑动贴边；气泡在越界时翻转伸缩方向（默认绕精灵居中）。 ---- */
+function applyEdge() {
+  const sp = spriteWrap.offsetWidth || 148
+  let hw = sp / 2
   const bEl = bubbles.firstElementChild
-  if (bEl) half = Math.max(half, bEl.offsetWidth / 2)
+  if (bEl) hw = Math.max(hw, bEl.offsetWidth / 2)
   const pEl = panelHost.firstElementChild
-  if (pEl) half = Math.max(half, pEl.offsetWidth / 2)
-  const lo = Math.max(0, geo.visL) + half + 8 - FLOAT_CENTER
-  const hi = Math.min(WIN_W, geo.visR) - half - 8 - FLOAT_CENTER
-  float.style.setProperty('--edge-shift', Math.max(lo, Math.min(hi, 0)) + 'px')
+  if (pEl) hw = Math.max(hw, pEl.offsetWidth / 2)
+  const { visL, visR } = geo
+  // 贴顶翻转：预留带锚点恒为窗口坐标 302（窗高=300+spriteH+180，float bottom:178），
+  // 探出屏外的量 topOff 一旦吃掉气泡高度就让气泡翻到脚下。
+  const bH = bEl ? bEl.offsetHeight : 0
+  const flipDown = bH > 0 && (geo.topOff || 0) > 302 - bH - 10
+  float.style.setProperty('--duck', (bH + 14) + 'px')
+  const centerR = FLOAT_CENTER + sp / 2, centerL = FLOAT_CENTER - sp / 2
+  const mode = WIN_W - visR > 4 && WIN_W - visR >= visL ? 'right' : visL > 4 ? 'left' : null
+  const edgeR = mode === 'right', edgeL = mode === 'left'
+  const anchorR = Math.min(centerR, visR - 8)
+  const anchorL = Math.max(centerL, visL + 8)
+  const flipR = edgeR && FLOAT_CENTER + hw > visR - 4
+  const flipL = edgeL && FLOAT_CENTER - hw < visL + 4
+  document.body.classList.toggle('edge-right', edgeR)
+  document.body.classList.toggle('edge-left', edgeL)
+  document.body.classList.toggle('flip-right', flipR)
+  document.body.classList.toggle('flip-left', flipL)
+  document.body.classList.toggle('flip-down', flipDown)
+  if (edgeR) float.style.setProperty('--anchorR', anchorR + 'px')
+  if (flipR) float.style.setProperty('--roomR', Math.max(120, anchorR - 4) + 'px')
+  if (edgeL) float.style.setProperty('--anchorL', anchorL + 'px')
+  if (flipL) float.style.setProperty('--roomL', Math.max(120, WIN_W - anchorL - 4) + 'px')
+}
+
+function updateShape() {
+  applyEdge()
   const rects = []
   const push = (el, pad) => {
     if (!el) return
@@ -407,16 +445,18 @@ let drag = null
 sprite.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return
   sprite.setPointerCapture?.(e.pointerId)
-  drag = { x: e.screenX, y: e.screenY, moved: 0 }
+  drag = { x: e.screenX, y: e.screenY, lx: e.screenX, ly: e.screenY, moved: 0 }
   sprite.style.cursor = 'grabbing'
   hovered = false; renderPanel(); updateShape()
   e.preventDefault()
+  ipcRenderer.send('pet-drag-start')
 })
 addEventListener('pointermove', (e) => {
   if (!drag) return
+  drag.moved += Math.abs(e.screenX - drag.lx) + Math.abs(e.screenY - drag.ly)
+  drag.lx = e.screenX; drag.ly = e.screenY
   const dx = e.screenX - drag.x, dy = e.screenY - drag.y
-  drag.moved += Math.abs(dx) + Math.abs(dy)
-  if (dx || dy) { ipcRenderer.send('pet-drag', dx, dy); drag.x = e.screenX; drag.y = e.screenY }
+  if (dx || dy) ipcRenderer.send('pet-drag', dx, dy)
 })
 addEventListener('pointerup', async () => {
   if (!drag) return
@@ -444,7 +484,7 @@ addEventListener('pointerleave', () => {
   clearTimeout(hideTimer)
   hideTimer = setTimeout(() => { if (renaming !== true) { hovered = false; renderPanel(); updateShape() } }, 300)
 })
-addEventListener('wheel', (e) => { ipcRenderer.send('pet-wheel', e.deltaY); e.preventDefault() }, { passive: false })
+addEventListener('wheel', (e) => { if (drag) return; ipcRenderer.send('pet-wheel', e.deltaY); e.preventDefault() }, { passive: false })
 addEventListener('contextmenu', (e) => { e.preventDefault(); ipcRenderer.send('pet-menu') })
 addEventListener('resize', updateShape)
 
