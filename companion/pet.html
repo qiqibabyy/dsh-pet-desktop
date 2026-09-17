@@ -10,7 +10,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 #float {
-  position: absolute; left: 50%; bottom: 178px; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: 178px; transform: translateX(calc(-50% + var(--edge-shift, 0px)));
   display: flex; flex-direction: column; align-items: center;
   user-select: none; -webkit-user-select: none; pointer-events: auto;
 }
@@ -20,7 +20,9 @@ body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 .spriteWrap { position: relative; flex: 0 0 auto; }
 
 .bubble {
-  position: absolute; bottom: 100%; margin-bottom: 6px; white-space: nowrap;
+  position: absolute; bottom: 100%; left: 0; right: 0; margin: 0 auto 6px;
+  width: max-content; max-width: calc(100vw - 48px); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
   padding: calc(4px * var(--pet-bubble-scale, 1)) calc(10px * var(--pet-bubble-scale, 1));
   border-radius: 999px; font-size: calc(12px * var(--pet-bubble-scale, 1));
   line-height: 1.4; color: #f4f7ff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -41,7 +43,8 @@ body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 .bubbleWhisper::before { content: '「'; margin-right: 2px; opacity: 0.7; }
 .bubbleWhisper::after { content: '」'; margin-left: 2px; opacity: 0.7; }
 .bubbleStack {
-  position: absolute; bottom: 100%;
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  width: max-content; max-width: calc(100vw - 48px); margin-inline: auto;
   display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: auto;
 }
 .bubbleAnchor { position: relative; display: inline-flex; }
@@ -62,7 +65,8 @@ body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
 @keyframes pet-panel-in { from { opacity: 0; transform: translateY(4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes pet-bubble-pop { 0% { opacity: 0; transform: translateY(6px) scale(0.85); } 15% { opacity: 1; transform: translateY(0) scale(1.05); } 25% { transform: translateY(0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px) scale(0.95); } }
 .panel {
-  position: absolute; top: 100%; margin-top: 8px;
+  position: absolute; top: 100%; left: 0; right: 0; margin: 8px auto 0;
+  width: max-content; max-width: calc(100vw - 48px);
   background: linear-gradient(165deg, rgba(19, 28, 54, 0.95), rgba(7, 11, 26, 0.97));
   border: 1px solid rgba(126, 152, 255, 0.3); border-radius: 12px; padding: 10px 12px;
   color: #e6ebf8; font-size: 12px;
@@ -134,6 +138,9 @@ let def = null, snap = null, feedback = null, hideTimer = 0
 let hovered = false, renaming = false, nameDraft = '', peek = false, pinned = false, hiddenUI = false
 let imageReady = false, spriteH = 160, bubbleScale = 1, decoDataUrl = null
 const frame = { track: null, index: 0, elapsed: 0 }
+// 屏边适配：WIN_W 与主进程 WIN_WIDTH 一致；geo 由主进程 pet-geo 推送。
+const WIN_W = 540, FLOAT_CENTER = 270
+let geo = { visL: 0, visR: 540 }
 
 /* ---- 帧循环：与 PetSprite 相同（durations 驱动、非循环停末帧、缩放坐标） ---- */
 function trimTrack(t, n) {
@@ -348,6 +355,16 @@ function renderSprite() {
 }
 
 function updateShape() {
+  // 贴屏适配：把内容层(精灵+最宽气泡/面板整体)平移回可见屏区。
+  // 主进程在拖拽/启动/缩放时推送 geo = 窗口横区间中「在屏内」的部分。
+  let half = (spriteWrap.offsetWidth || 148) / 2
+  const bEl = bubbles.firstElementChild
+  if (bEl) half = Math.max(half, bEl.offsetWidth / 2)
+  const pEl = panelHost.firstElementChild
+  if (pEl) half = Math.max(half, pEl.offsetWidth / 2)
+  const lo = Math.max(0, geo.visL) + half + 8 - FLOAT_CENTER
+  const hi = Math.min(WIN_W, geo.visR) - half - 8 - FLOAT_CENTER
+  float.style.setProperty('--edge-shift', Math.max(lo, Math.min(hi, 0)) + 'px')
   const rects = []
   const push = (el, pad) => {
     if (!el) return
@@ -441,6 +458,7 @@ ipcRenderer.on('pet-def', (_e, d) => {
   document.title = d.displayName || d.id
 })
 ipcRenderer.on('pet-deco', (_e, d) => { decoDataUrl = d.dataUrl; renderBubbles(); updateShape() })
+ipcRenderer.on('pet-geo', (_e, g) => { geo = g; updateShape() })
 let lastSig = ''
 ipcRenderer.on('pet-state', (_e, s) => {
   spriteH = s.spriteH; bubbleScale = s.bubbleScale

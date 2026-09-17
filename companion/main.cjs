@@ -34,9 +34,10 @@ const API = '/api/desktop-pet'
 
 const ROW_ORDER = ['idle', 'running-right', 'running-left', 'waving', 'jumping', 'failed', 'waiting', 'running', 'review']
 // 窗口布局常量：气泡预留高 / 面板预留高 / 总宽。
+// 540 = 精灵居中最宽气泡(≤504)所需；贴屏边时渲染层平移内容层保气泡完整。
 const BUB_RESERVE = 300
 const PANEL_RESERVE = 180
-const WIN_WIDTH = 360
+const WIN_WIDTH = 540
 // 与 persist.bubbleScaleFor 相同的公式（renderer 也要算 --pet-bubble-scale）。
 const BUBBLE_BASE_SIZE_PX = 160, BUBBLE_BASE_FONT_PX = 12, BUBBLE_FONT_MIN_PX = 10, BUBBLE_FONT_MAX_PX = 24
 
@@ -149,15 +150,22 @@ async function poll() {
 function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-saver') }
 function applyClickThrough() { if (win) win.setIgnoreMouseEvents(!!settings.clickThrough, { forward: true }) }
 
-// 整窗收进「所在显示器」的工作区：气泡层在窗口内部，窗不越屏气泡就不可能被裁。
-// 用 getDisplayMatching 而非主屏，副屏用户拖过去不会被拽回来。
+// 屏边适配：窗口可以探出屏外（让精灵本体贴边），但保证
+//   · 至少 360px 窗口可见（渲染层平移内容层后气泡最宽 504 也能留在屏内）
+//   · y 轴整窗收进工作区（上方 300px 是气泡预留带，绝不能出屏）
+// 用 getDisplayMatching，多屏拖到副屏不会被主屏拽回。
+// 每次落位后把「窗口可见横区间」推给渲染层算平移量。
 function clampToScreen() {
   if (!win) return
   const b = win.getBounds()
   const wa = screen.getDisplayMatching(b).workArea
-  const x = Math.max(wa.x, Math.min(b.x, wa.x + wa.width - b.width))
+  const x = Math.max(wa.x - (WIN_WIDTH - 360), Math.min(b.x, wa.x + wa.width - 360))
   const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - b.height))
   if (x !== b.x || y !== b.y) win.setBounds({ ...b, x, y })
+  win.webContents.send('pet-geo', {
+    visL: Math.max(0, wa.x - x),
+    visR: Math.min(WIN_WIDTH, wa.x + wa.width - x),
+  })
 }
 
 function buildMenu() {
@@ -178,17 +186,10 @@ function createWindow() {
   const wa = screen.getPrimaryDisplay().workArea
   spriteH = Math.max(64, Math.min(512, Math.round(160 * settings.zoom)))
   const h = windowHeightFor(spriteH)
-  const clamp = (p) => {
-    const wa = screen.getDisplayMatching({ x: p.x, y: p.y, width: WIN_WIDTH, height: h }).workArea
-    return {
-      x: Math.max(wa.x, Math.min(p.x, wa.x + wa.width - WIN_WIDTH)),
-      y: Math.max(wa.y, Math.min(p.y, wa.y + wa.height - h)),
-    }
-  }
   const onScreen = screen.getAllDisplays().some(d =>
     settings.pos && settings.pos.x >= d.bounds.x - 40 && settings.pos.x < d.bounds.x + d.bounds.width &&
     settings.pos.y >= d.bounds.y - 40 && settings.pos.y < d.bounds.y + d.bounds.height)
-  const pos = clamp(onScreen ? settings.pos : { x: wa.x + wa.width - WIN_WIDTH - 24, y: wa.y + wa.height - h - 8 })
+  const pos = onScreen ? settings.pos : { x: wa.x + wa.width - WIN_WIDTH - 24, y: wa.y + wa.height - h - 8 }
   win = new BrowserWindow({
     x: pos.x, y: pos.y, width: WIN_WIDTH, height: h,
     transparent: true, frame: false, resizable: false, movable: false,
@@ -197,6 +198,7 @@ function createWindow() {
   })
   applyTopmost()
   applyClickThrough()
+  clampToScreen()
   win.setMenu(null)
   win.loadFile(path.join(__dirname, 'pet.html'))
   win.on('close', () => { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() })
@@ -210,7 +212,11 @@ function createWindow() {
   win.webContents.on('ipc-message', (_e, channel, arg) => { if (channel === 'pet-debug') console.log('[debug] ' + JSON.stringify(arg)) })
   win.webContents.on('did-fail-load', (_e, c, d) => console.log('[win] did-fail-load: ' + c + ' ' + d))
   win.on('closed', () => { win = null })
-  win.webContents.once('did-finish-load', () => win.webContents.send('pet-hidden', settings.hidden))
+  win.webContents.once('did-finish-load', () => {
+    if (!win) return
+    win.webContents.send('pet-hidden', settings.hidden)
+    clampToScreen() // 补发 pet-geo：构造期那次 renderer 还没监听
+  })
 }
 
 ipcMain.on('pet-menu', () => { if (win) buildMenu().popup({ window: win }) })
