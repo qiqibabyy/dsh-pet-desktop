@@ -11,7 +11,7 @@
  *   .quit-intent   written by the companion's own 退出 menu; suppresses
  *                  respawn for the current host session
  *
- * @module @linxin666/dsh-pet-desktop/src/supervisor
+ * @module @qiqibabyy/dsh-pet-desktop/src/supervisor
  */
 
 import { spawn, spawnSync } from 'node:child_process'

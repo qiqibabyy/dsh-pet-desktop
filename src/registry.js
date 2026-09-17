@@ -13,7 +13,7 @@
  * and v2 `sprite2d` blocks. Other renderers (live2d/frames2d) are skipped with
  * a warning — the desktop companion renders the 9-track sprite contract.
  *
- * @module @linxin666/dsh-pet-desktop/src/registry
+ * @module @qiqibabyy/dsh-pet-desktop/src/registry
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'

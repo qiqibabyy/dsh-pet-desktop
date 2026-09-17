@@ -1,5 +1,5 @@
 /**
- * DSH 桌宠伴生窗口 — @linxin666/dsh-pet-desktop 的桌面渲染端。
+ * DSH 桌宠伴生窗口 — @qiqibabyy/dsh-pet-desktop 的桌面渲染端。
  *
  * 数据面：全部来自本插件宿主的 loopback API —— /api/desktop-pet/state 快照
  * (animation/phase/sessions/decoration/announcement/affinity/treats/display)

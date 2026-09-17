@@ -21,7 +21,7 @@ A **self-contained** [DSH](https://github.com/deepseek-ai) harness plugin: when 
 Requires DSH Desktop (or any harness host with the web server).
 
 ```bash
-dsh plugin --profile web add @linxin666/dsh-pet-desktop
+dsh plugin --profile web add @qiqibabyy/dsh-pet-desktop
 # local development:
 dsh plugin --profile web add link:../dsh-pet-desktop
 ```

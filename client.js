@@ -10,7 +10,7 @@
  * specifiers arrive through the injected require.
  */
 window.__ModuleLoader__.load({
-  id: "@linxin666/dsh-pet-desktop",
+  id: "@qiqibabyy/dsh-pet-desktop",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;

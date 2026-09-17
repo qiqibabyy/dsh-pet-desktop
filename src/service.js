@@ -12,7 +12,7 @@
  * State lives in <DSH_HOME>/desktop-pet.json — independent of the web pet's
  * pet.json, so both plugins can coexist without sharing a ledger.
  *
- * @module @linxin666/dsh-pet-desktop/src/service
+ * @module @qiqibabyy/dsh-pet-desktop/src/service
  */
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'

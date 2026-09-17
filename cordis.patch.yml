@@ -2,4 +2,4 @@
 # Install: dsh plugin --profile web add link:<this-directory>
 - insert:
     - id: pet-desktop
-      name: '@linxin666/dsh-pet-desktop'
+      name: '@qiqibabyy/dsh-pet-desktop'

@@ -1,5 +1,5 @@
 {
-  "name": "@linxin666/dsh-pet-desktop",
+  "name": "@qiqibabyy/dsh-pet-desktop",
   "version": "0.1.0",
   "description": "A self-contained desktop pet plugin for DeepSeek Harness: Codex-style frame-animated pet living on your desktop, with its own affinity state machine, pet registry (Codex pet.json compatible), activity bubbles wired to harness sessions, decorations, and a settings-page card. No web pet required.",
   "type": "module",

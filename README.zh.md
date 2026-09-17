@@ -20,7 +20,7 @@
 需要 DSH Desktop（或任何带 web server 的 harness 宿主）。
 
 ```bash
-dsh plugin --profile web add @linxin666/dsh-pet-desktop
+dsh plugin --profile web add @qiqibabyy/dsh-pet-desktop
 # 本地开发：
 dsh plugin --profile web add link:../dsh-pet-desktop
 ```

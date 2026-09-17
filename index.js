@@ -1,5 +1,5 @@
 /**
- * @linxin666/dsh-pet-desktop — a self-contained desktop pet plugin for DeepSeek
+ * @qiqibabyy/dsh-pet-desktop — a self-contained desktop pet plugin for DeepSeek
  * Harness. Codex-style frame-animated pet living on the desktop: own affinity
  * ledger (<DSH_HOME>/desktop-pet.json), own pet registry (native Codex pet
  * directories + user pet dirs), activity bubbles wired directly to harness
@@ -15,7 +15,7 @@
  *   client.js         settings-page card (module-host CJS factory)
  *   companion/        the Electron desktop app
  *
- * @module @linxin666/dsh-pet-desktop
+ * @module @qiqibabyy/dsh-pet-desktop
  */
 
 import { get as httpRequest } from 'node:http'
@@ -132,8 +132,8 @@ export function applyImpl(ctx, config = {}) {
 const MOUNTED = Symbol.for('dsh-web.mounted-plugins')
 export const apply = ((fn) => (...args) => {
   const mounted = (globalThis[MOUNTED] ??= new Set())
-  if (mounted.has('@linxin666/dsh-pet-desktop')) return
-  mounted.add('@linxin666/dsh-pet-desktop')
-  args[0]?.effect?.(() => () => mounted.delete('@linxin666/dsh-pet-desktop'))
+  if (mounted.has('@qiqibabyy/dsh-pet-desktop')) return
+  mounted.add('@qiqibabyy/dsh-pet-desktop')
+  args[0]?.effect?.(() => () => mounted.delete('@qiqibabyy/dsh-pet-desktop'))
   return fn(...args)
 })(applyImpl)

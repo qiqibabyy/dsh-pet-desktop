@@ -20,7 +20,7 @@
  * Fence: loopback socket + loopback Host + same-origin Origin (CSRF hygiene).
  * The companion and the browser GUI both reach it as 127.0.0.1.
  *
- * @module @linxin666/dsh-pet-desktop/src/routes
+ * @module @qiqibabyy/dsh-pet-desktop/src/routes
  */
 
 import { readFileSync, statSync, writeFileSync } from 'node:fs'
