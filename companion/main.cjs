@@ -137,6 +137,16 @@ async function poll() {
         clampToScreen()
       }
     }
+    // 自愈：窗高被任何历史来源撑歪时缩回正确值（保持精灵底边不动），贴边钳回。
+    if (win && !dragging) {
+      const b = win.getBounds()
+      const wantH = windowHeightFor(spriteH)
+      if (b.height !== wantH) {
+        tl('selfheal', [b.height, b.y], [wantH, b.y + b.height - wantH])
+        win.setBounds({ x: b.x, y: b.y + b.height - wantH, width: WIN_WIDTH, height: wantH })
+        clampToScreen()
+      }
+    }
     win && win.webContents.send('pet-state', {
       spriteH,
       bubbleScale: bubbleScaleFor(state.display ?? {}),
@@ -305,12 +315,21 @@ ipcMain.on('pet-shape', (_e, rects) => {
   if (process.env.DSH_PET_NOSHAPE) return
   if (win && Array.isArray(rects) && rects.length > 0) {
     try {
+      // 关键防线：Windows 会用 SetWindowRgn 适配超出窗口的 region——曾把窗口逐笔拉高
+      // （拖拽期整窗 rect 是 CSS 单位，与 DIP 有微小差 → 每笔 +几十 px 的"高度下降"）。
+      // 一律钳制到窗口逻辑尺寸，region 永不越界。
+      const maxW = WIN_WIDTH, maxH = windowHeightFor(spriteH)
+      const clampR = (r) => {
+        const x = Math.max(0, Math.min(maxW, Math.round(r.x)))
+        const y = Math.max(0, Math.min(maxH, Math.round(r.y)))
+        const width = Math.max(0, Math.min(maxW - x, Math.round(r.x + r.width) - x))
+        const height = Math.max(0, Math.min(maxH - y, Math.round(r.y + r.height) - y))
+        return { x, y, width, height }
+      }
       // Windows setShape 用窗口左上角相对的 DIP，且必须按面积降序。
-      const shaped = rects.map(r => ({
-        x: Math.round(r.x), y: Math.round(r.y),
-        width: Math.round(r.width), height: Math.round(r.height),
-      })).sort((a, b) => b.width * b.height - a.width * a.height)
-      win.setShape(shaped)
+      const shaped = rects.map(clampR).filter(r => r.width > 0 && r.height > 0)
+        .sort((a, b) => b.width * b.height - a.width * a.height)
+      if (shaped.length) win.setShape(shaped)
     } catch (err) { console.log('[shape] ' + err.message) }
   }
 })
