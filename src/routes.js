@@ -10,6 +10,9 @@
  *   POST /api/desktop-pet/set-pet          {petId}
  *   POST /api/desktop-pet/set-decoration   {decorationId} ('none' clears)
  *   POST /api/desktop-pet/set-display      {visible?,size?,right?,bottom?,bubbleScale?}
+ *   GET|POST /api/desktop-pet/window       companion window flags {topmost,clickThrough,hidden,zoom}
+ *                                          (POST merges; backs the settings-page controls so a
+ *                                          click-through pet can always be revived from the browser)
  *   POST /api/desktop-pet/announce         {source,kind,title,amount?,percent?,note?,tone?,ttlMs?}
  *   GET|HEAD /desktop-pet-assets/<petId>/<file>            (allow-listed pet files)
  *   GET|HEAD /desktop-pet-assets/decorations/<id>/<file>   (allow-listed decoration files)
@@ -20,7 +23,9 @@
  * @module @linxin666/dsh-pet-desktop/src/routes
  */
 
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { runtimeDir } from './supervisor.js'
 
 const MIME = { '.webp': 'image/webp', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.gif': 'image/gif', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' }
 
@@ -63,6 +68,19 @@ function readBody(req) {
  * @param supervisor CompanionSupervisor (for /status)
  * @returns WebRoute[] to register on ctx.webServer
  */
+const WINDOW_DEFAULTS = { pos: null, zoom: 1, topmost: true, clickThrough: false, hidden: false }
+
+function readWindowRaw() {
+  try {
+    const f = JSON.parse(readFileSync(path.join(runtimeDir(), 'desktop-pet-window.json'), 'utf8'))
+    return f && typeof f === 'object' ? f : {}
+  } catch { return {} }
+}
+function readWindowFlags() {
+  const w = { ...WINDOW_DEFAULTS, ...readWindowRaw() }
+  return { topmost: !!w.topmost, clickThrough: !!w.clickThrough, hidden: !!w.hidden, zoom: Number.isFinite(w.zoom) ? w.zoom : 1 }
+}
+
 export function makeDesktopPetRoutes(service, registry, supervisor) {
   const json = (method, run) => ({
     kind: 'exact',
@@ -101,6 +119,26 @@ export function makeDesktopPetRoutes(service, registry, supervisor) {
     { ...json('POST', (b) => service.setDecoration(String(b?.decorationId ?? ''))), path: '/api/desktop-pet/set-decoration' },
     { ...json('POST', (b) => service.setDisplay(b ?? {})), path: '/api/desktop-pet/set-display' },
     { ...json('POST', (b) => service.announce(b)), path: '/api/desktop-pet/announce' },
+    // 伴生窗口的可读写标志（置顶/穿透/隐藏/缩放）。文件由伴生进程与本页共享：
+    // 这里只做「读-合并-写」，绝不动 pos（伴生进程独占）。
+    {
+      ...json('GET', () => ({ ok: true, window: readWindowFlags() })),
+      path: '/api/desktop-pet/window',
+    },
+    {
+      ...json('POST', (b) => {
+        const patch = {}
+        if (typeof b?.topmost === 'boolean') patch.topmost = b.topmost
+        if (typeof b?.clickThrough === 'boolean') patch.clickThrough = b.clickThrough
+        if (typeof b?.hidden === 'boolean') patch.hidden = b.hidden
+        if (Number.isFinite(b?.zoom)) patch.zoom = Math.min(3.2, Math.max(0.4, b.zoom))
+        if (!Object.keys(patch).length) return { ok: false, error: 'no-valid-fields', window: readWindowFlags() }
+        const merged = { ...readWindowRaw(), ...patch }
+        writeFileSync(path.join(runtimeDir(), 'desktop-pet-window.json'), JSON.stringify(merged))
+        return { ok: true, window: readWindowFlags() }
+      }),
+      path: '/api/desktop-pet/window',
+    },
   ]
 
   const serve = (req, res, file) => {

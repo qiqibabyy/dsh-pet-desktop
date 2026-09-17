@@ -14,7 +14,7 @@ A **self-contained** [DSH](https://github.com/deepseek-ai) harness plugin: when 
 - 💬 **Live activity bubbles**: harness session events project onto six phases (waiting / thinking / tool / review / done / failed); 389 built-in zh chatter lines rotating every 4 s; tool "whispers" («…」) with 9 s / 5 s cooldowns and 8 s on-screen TTL; multi-session bubble stack with `+N` badge
 - 💕 **Affinity**: pet +1 (10 s cooldown), feed +5 (costs 1 treat, 30 s cooldown), completed turn +1 (idempotent per session turn); treats accrue +1 per 30 turns and +1 per 5 h, capped at 20; affinity **never decays**
 - 🐋 **Decoration**: bundled whale status ornament, phase-driven frame segments, switchable/off in settings
-- ⚙️ **Settings integration**: a “桌面宠物” section — auto-start, status + start/stop, pet picker, decoration picker, electron path
+- ⚙️ **Settings integration**: a “桌面宠物” section — auto-start, status + start/stop, window controls (always-on-top, click-through, hide/summon, size slider), pet picker with sprite thumbnails, decoration picker, electron path. Click-through can always be undone here — no way to trap yourself
 
 ## Install
 

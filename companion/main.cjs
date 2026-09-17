@@ -52,7 +52,32 @@ const settings = Object.assign(
   })(),
 )
 if (Array.isArray(settings.pos)) settings.pos = { x: settings.pos[0], y: settings.pos[1] }
-const saveSettings = () => fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings))
+let settingsMtime = (() => { try { return fs.statSync(SETTINGS_FILE).mtimeMs } catch { return 0 } })()
+const saveSettings = () => {
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings))
+    settingsMtime = fs.statSync(SETTINGS_FILE).mtimeMs
+  } catch { /* best effort */ }
+}
+// 设置页（浏览器）会直接改写本文件——轮询里检测外部变更并应用。
+// 这是穿透/隐藏状态的永久逃生通道，点不到她也能在网页上救回来。
+function syncSettingsFromDisk() {
+  let m
+  try { m = fs.statSync(SETTINGS_FILE).mtimeMs } catch { return }
+  if (m === settingsMtime) return
+  settingsMtime = m
+  let next
+  try { next = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) } catch { return }
+  if (!next || typeof next !== 'object') return
+  const changed = ['zoom', 'topmost', 'clickThrough', 'hidden'].filter(k => next[k] !== undefined && next[k] !== settings[k])
+  Object.assign(settings, next)
+  if (Array.isArray(settings.pos)) settings.pos = { x: settings.pos[0], y: settings.pos[1] }
+  if (!changed.length || !win) return
+  if (changed.includes('topmost')) applyTopmost()
+  if (changed.includes('clickThrough')) applyClickThrough()
+  if (changed.includes('hidden')) win.webContents.send('pet-hidden', settings.hidden)
+  // zoom 的窗高变化由 poll 的 h!==spriteH 分支接手。
+}
 
 function request(method, urlPath, body) {
   return new Promise((resolve, reject) => {
@@ -96,6 +121,7 @@ function windowHeightFor(h) {
 }
 
 async function poll() {
+  syncSettingsFromDisk()
   try {
     const state = await get(`${API}/state`)
     const petId = state.pet && state.pet.id
