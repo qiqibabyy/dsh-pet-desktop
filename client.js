@@ -123,6 +123,8 @@ window.__ModuleLoader__.load({
       else if (status) { statusText = '已停止'; statusColor = '#fbbf24'; }
 
       const aff = view ? view.affinity : null;
+      const usage = view ? view.usage : null;
+      const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n | 0));
       const currentPet = view && view.pet ? view.pet.id : '';
       const currentDeco = view && view.decoration ? view.decoration.id : 'none';
       const zoom = zoomDraft ?? (flags ? flags.zoom : 1);
@@ -142,6 +144,9 @@ window.__ModuleLoader__.load({
               h('button', { className: 'dsp-btn dsp-btnGhost', disabled: busy || !(status && status.running), onClick: () => act(() => api('/stop', {})) }, '停止'),
             ),
           ),
+          Row('今日 token 消耗', h('span', { className: 'dsp-chip' },
+            usage ? fmtTok(usage.total) + ' tok · 输入 ' + fmtTok(usage.input) + ' · 输出 ' + fmtTok(usage.output) + ' · 缓存 ' + fmtTok(usage.cacheRead + usage.cacheWrite) + ' · ' + usage.calls + ' 次调用' : '—'),
+            '只统计本插件运行期间观测到的会话调用，本地零点自动归零，重启不丢；账单权威口径见 dsh-usage。'),
           Row('随 harness 自动启动', h(Switch, {
             on: enabled, disabled: !ready || busy, onChange: (v) => act(() => scope.set('enabled', v)),
           }), '摸头 +1、喂食 +5、完成对话 +1；亲密度永不衰减。拖到屏幕边缘会吸附钉住，气泡与卡片自动翻转不被裁切。'),

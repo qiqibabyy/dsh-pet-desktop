@@ -94,6 +94,7 @@ body.flip-down .panel { top: calc(100% + var(--duck, 48px)); }
 .statRank { color: #9db4ff; font-weight: 600; }
 .statTreats { color: #7dd3fc; font-weight: 600; }
 .statPoints { color: #fcd34d; font-weight: 600; }
+.statTokens { color: #86efac; font-weight: 600; }
 .renameRow { display: flex; gap: 6px; align-items: center; }
 .nameInput {
   flex: 1; min-width: 0; border: 1px solid rgba(126, 152, 255, 0.5); border-radius: 6px;
@@ -317,16 +318,17 @@ function renderBubbles() {
 
 /* ---- 悬停面板（同款 DOM：两行数值 + 动作/改名行） ---- */
 function renderPanel() {
+  const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1000 ? (n / 1000).toFixed(n >= 1e4 ? 0 : 1) + 'k' : String(n | 0))
   panelHost.innerHTML = ''
   if (!tapped || !snap || hiddenUI || renaming === 'pending') return // 只点不碰才弹卡；路过/静止一律清爽
   const panel = document.createElement('div')
   panel.className = 'panel'
   panel.onpointerenter = () => clearTimeout(hideTimer)
-  const aff = snap.affinity || {}, treats = snap.treats || {}
+  const aff = snap.affinity || {}, treats = snap.treats || {}, usage = snap.usage || {}
   const row1 = document.createElement('div'); row1.className = 'rankRow'
   row1.innerHTML = '<span class="nameCell">' + esc(snap.name ?? snap.displayName ?? '') + '</span><span class="statRank">亲密度 ' + esc(aff.rank ?? '?') + '</span>'
   const row2 = document.createElement('div'); row2.className = 'rankRow'
-  row2.innerHTML = '<span class="statTreats">小鱼干 ×' + (treats.stocked ?? 0) + '</span><span class="statPoints">' + (aff.points ?? 0) + ' 点</span>'
+  row2.innerHTML = '<span class="statTreats">小鱼干 ×' + (treats.stocked ?? 0) + '</span><span class="statTokens">今日 ' + fmtTok(usage.total ?? 0) + ' tok</span><span class="statPoints">' + (aff.points ?? 0) + ' 点</span>'
   panel.append(row1, row2)
   if (renaming === true) {
     const rr = document.createElement('div'); rr.className = 'renameRow'

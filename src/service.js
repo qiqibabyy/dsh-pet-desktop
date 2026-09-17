@@ -57,6 +57,7 @@ const MAX_SESSION_BUBBLES = 12
 
 const finite = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+const localDateKey = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 function emptyPersist() {
   return {
@@ -65,6 +66,7 @@ function emptyPersist() {
     decorationId: '',
     affinity: { points: 0, lastPetAt: 0, lastFeedAt: 0, pets: 0, feeds: 0, petRejects: 0, feedRejects: 0, turns: 0 },
     treats: { treats: 0, lastTreatGrantAt: 0, turnsAtLastTreatGrant: 0 },
+    usage: { day: '', input: 0, output: 0, cacheRead: 0, cacheWrite: 0, calls: 0 },
     display: { visible: true, size: 160, right: 24, bottom: 120, bubbleScale: 1 },
   }
 }
@@ -76,6 +78,7 @@ function loadPersist(file) {
     const base = emptyPersist()
     const a = raw.affinity ?? {}
     const t = raw.treats ?? {}
+    const u = raw.usage ?? {}
     const d = raw.display ?? {}
     const big = clamp(finite(a.points, 0), 0, AFFINITY_MAX)
     const names = {}
@@ -100,6 +103,14 @@ function loadPersist(file) {
         treats: Math.round(clamp(finite(t.treats, 0), 0, TREAT_CONFIG.maxTreats)),
         lastTreatGrantAt: clamp(finite(t.lastTreatGrantAt, 0), 0, Number.MAX_SAFE_INTEGER),
         turnsAtLastTreatGrant: clamp(finite(t.turnsAtLastTreatGrant, 0), 0, Number.MAX_SAFE_INTEGER),
+      },
+      usage: {
+        day: typeof u.day === 'string' ? u.day.slice(0, 10) : '',
+        input: Math.round(clamp(finite(u.input, 0), 0, Number.MAX_SAFE_INTEGER)),
+        output: Math.round(clamp(finite(u.output, 0), 0, Number.MAX_SAFE_INTEGER)),
+        cacheRead: Math.round(clamp(finite(u.cacheRead, 0), 0, Number.MAX_SAFE_INTEGER)),
+        cacheWrite: Math.round(clamp(finite(u.cacheWrite, 0), 0, Number.MAX_SAFE_INTEGER)),
+        calls: Math.round(clamp(finite(u.calls, 0), 0, Number.MAX_SAFE_INTEGER)),
       },
       display: {
         visible: d.visible !== false,
@@ -201,6 +212,30 @@ export class PetLedger {
 
   treatView() {
     return { stocked: this.state.treats.treats, max: TREAT_CONFIG.maxTreats }
+  }
+
+  /**
+   * Fold one assistant/message usage into today's bucket; the bucket zeroes
+   * itself at the local-day boundary. Best-effort by design: only messages
+   * observed while the harness ran count (this is the pet's own counter,
+   * not the authoritative billing ledger — dsh-usage owns that).
+   */
+  foldUsage(usage, now = Date.now()) {
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+    const u = this.state.usage
+    const day = localDateKey(now)
+    if (u.day !== day) { u.day = day; u.input = 0; u.output = 0; u.cacheRead = 0; u.cacheWrite = 0; u.calls = 0 }
+    u.input += num(usage.inputTokens)
+    u.output += num(usage.outputTokens)
+    u.cacheRead += num(usage.cacheReadTokens)
+    u.cacheWrite += num(usage.cacheWriteTokens)
+    u.calls += 1
+    this.save()
+  }
+
+  usageView() {
+    const u = this.state.usage
+    return { day: u.day, total: u.input + u.output + u.cacheRead + u.cacheWrite, input: u.input, output: u.output, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite, calls: u.calls }
   }
 
   interactPet(remarks, now = Date.now()) {
@@ -328,6 +363,7 @@ export class DesktopPetService {
         }
         case 'assistant/message':
           this.commit(sid, { phase: 'review', line: this.voice.line('review') })
+          if (data.usage && typeof data.usage === 'object') this.ledger.foldUsage(data.usage)
           break
         case 'tool/call': {
           const name = typeof data.name === 'string' ? data.name : 'tool'
@@ -447,6 +483,7 @@ export class DesktopPetService {
       ...(announcement ? { announcement } : {}),
       affinity: led.affinityView(now),
       treats: led.treatView(),
+      usage: led.usageView(),
       display: led.state.display,
       pet: pet ? { id: pet.id, displayName: pet.displayName, description: pet.description } : { id: '', displayName: '待领养', description: '把 Codex 宠物目录放进 ~/.codex/pets 或设置「宠物目录」' },
       name: (pet && led.state.names[pet.id]) || pet?.displayName || '桌宠',

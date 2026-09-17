@@ -90,6 +90,15 @@ try {
   led.state.affinity.points = 12345
   led.save()
   assert.equal(new PetLedger(file).state.affinity.points, 12345, 'roundtrip')
+  // daily token bucket: fold / total / local-day rollover / persistence
+  const usageFile = path.join(tmp, 'usage.json')
+  const led2 = new PetLedger(usageFile)
+  led2.foldUsage({ inputTokens: 100, outputTokens: 50, cacheReadTokens: 25 }, Date.parse('2026-01-01T10:00:00'))
+  led2.foldUsage({ inputTokens: 10, outputTokens: 5 }, Date.parse('2026-01-01T11:00:00'))
+  assert.deepEqual(led2.usageView(), { day: '2026-01-01', total: 190, input: 110, output: 55, cacheRead: 25, cacheWrite: 0, calls: 2 }, 'usage folds with totals')
+  led2.foldUsage({ inputTokens: 7 }, Date.parse('2026-01-02T09:00:00'))
+  assert.equal(led2.usageView().total, 7, 'local-day rollover zeroes the bucket')
+  assert.equal(new PetLedger(usageFile).usageView().calls, 1, 'usage persists across reload')
 
   /* ---------- chatter engine ---------- */
   assert.ok(BUILTIN_REMARKS.pet.length >= 8, 'remark pools ported')
@@ -135,6 +144,9 @@ try {
   view = service.buildView(Date.now() + 3000)
   assert.equal(view.animation, 'idle', 'done settles to idle after 2.4s')
   assert.equal(view.bubble, undefined, 'settled view has no bubble')
+  // usage fold rides the same assistant/message event the phase machine uses
+  handlers['session/event'](session, { type: 'assistant/message', data: { usage: { inputTokens: 42, outputTokens: 8 } } })
+  assert.equal(service.buildView(Date.now()).usage.total, 50, 'assistant/message usage folds into the view')
   handlers['session/disposed'](session)
   view = service.buildView(Date.now())
   assert.equal(view.animation, 'idle')

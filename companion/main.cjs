@@ -2,7 +2,7 @@
  * DSH 桌宠伴生窗口 — @qiqibabyy/dsh-pet-desktop 的桌面渲染端。
  *
  * 数据面：全部来自本插件宿主的 loopback API —— /api/desktop-pet/state 快照
- * (animation/phase/sessions/decoration/announcement/affinity/treats/display)
+ * (animation/phase/sessions/decoration/announcement/affinity/treats/usage/display)
  * 与 /api/desktop-pet/pets 定义；互动经 /api/desktop-pet/interact、/set-name
  * 回写 <DSH_HOME>/desktop-pet.json。视觉面：pet.module.css 原样移植 +
  * PetSprite.tsx 的 DOM 契约 (气泡栈/碎碎念/+N 角标/装饰纹样/反馈气泡/公告卡/
@@ -179,7 +179,7 @@ async function poll() {
       snapshot: {
         animation: state.animation, phase: state.phase, bubble: state.bubble,
         sessions: state.sessions, decoration: state.decoration, announcement: state.announcement,
-        affinity: state.affinity, treats: state.treats, name: state.name,
+        affinity: state.affinity, treats: state.treats, usage: state.usage, name: state.name,
         displayName: state.pet.displayName,
       },
     })
