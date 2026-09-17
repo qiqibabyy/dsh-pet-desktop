@@ -9,6 +9,7 @@ A **self-contained** [DSH](https://github.com/deepseek-ai) harness plugin: when 
 ## Features
 
 - 🖥️ **Desktop overlay**: frameless, always-on-top, transparent click-through toggle; right-click menu (hide/summon, zoom, click-through, quit)
+- 📌 **Edge-aware dragging**: 1:1 pointer tracking with snap — the instant she hits a screen edge she sticks there (recycling the mouse can't drag her back off; a fresh grab moves her again). Bubbles and the settings card auto-flip near edges — grow inward at left/right, drop below her feet at the top — nothing ever clips off-screen
 - 🎬 **Native Codex pet format**: auto-discovers `~/.codex/pets`, `~/.dsh/pets` and bundled `assets/pets` (`pet.json` + `spritesheet.webp`); the 9 standard tracks (idle / running-right / running-left / waving / jumping / failed / waiting / running / review) with per-pet `tracks` / `sequences` overrides
 - 💬 **Live activity bubbles**: harness session events project onto six phases (waiting / thinking / tool / review / done / failed); 389 built-in zh chatter lines rotating every 4 s; tool "whispers" («…」) with 9 s / 5 s cooldowns and 8 s on-screen TTL; multi-session bubble stack with `+N` badge
 - 💕 **Affinity**: pet +1 (10 s cooldown), feed +5 (costs 1 treat, 30 s cooldown), completed turn +1 (idempotent per session turn); treats accrue +1 per 30 turns and +1 per 5 h, capped at 20; affinity **never decays**

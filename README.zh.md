@@ -7,6 +7,7 @@
 ## 功能
 
 - 🖥️ **桌面常驻**：无边框、置顶、透明点击穿透可切换；右键菜单（收起/召唤、缩放、鼠标穿透、退出）
+- 📌 **贴边拖拽**：光标 1:1 跟手 + 触边吸附——撞上屏幕边的那刻钉住，回拉鼠标不会把她带离（重新按住才走）。气泡与设置卡随边自动翻向：左右贴边时向内生长，顶贴边时降到脚下，任何位置都不会被屏幕裁掉
 - 🎬 **Codex 宠物格式原生支持**：自动发现 `~/.codex/pets`、`~/.dsh/pets` 与包内 `assets/pets`（`pet.json` + `spritesheet.webp`），9 条标准轨道（idle / running-right / running-left / waving / jumping / failed / waiting / running / review）+ 每宠物 `tracks/sequences` 覆盖
 - 💬 **活动气泡**：直接监听 harness 会话事件，投影为 waiting / thinking / tool / review / done / failed 六相位；389 条内置中文文案按 4s 轮转，工具碎碎念（「」小气泡）带 9s/5s 冷却与 8s 上屏时限；多会话气泡栈 + `+N` 角标
 - 💕 **亲密度系统**：摸头 +1（10s 冷却）、喂食 +5（消耗 1 小鱼干，30s 冷却）、完成对话 +1（按会话轮次幂等）；小鱼干每 30 轮 +1、每 5 小时 +1、上限 20；亲密度**永不衰减**
