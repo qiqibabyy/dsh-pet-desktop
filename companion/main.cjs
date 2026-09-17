@@ -131,7 +131,9 @@ async function poll() {
       if (win) {
         const [x, y] = win.getPosition()
         // 精灵底边锚定；越界交给 clampToScreen（按所在显示器）。
-        win.setBounds({ x, y: y + (oldH === 0 ? 0 : oldH - h), width: WIN_WIDTH, height: windowHeightFor(h) })
+        const ny = y + (oldH === 0 ? 0 : oldH - h)
+        tl('resize', [oldH, h, x, y], [windowHeightFor(h), ny])
+        win.setBounds({ x, y: ny, width: WIN_WIDTH, height: windowHeightFor(h) })
         clampToScreen()
       }
     }
@@ -272,7 +274,7 @@ ipcMain.on('pet-drag', (_e, dx, dy) => {
     lastDragEndAt = Date.now()
     settings.pos = { x, y }
     saveSettings()
-    tl('snap', [b.x, b.y], [x, y])
+    tl('snap', [b.x, b.y, b.height, spriteH], [x, y])
   }
   win.setPosition(x, y)
   pushGeo(x, y, wa)
@@ -284,8 +286,17 @@ ipcMain.on('pet-drag-end', () => {
   lastDragEndAt = Date.now()
   if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() }
 })
-ipcMain.on('pet-wheel', (_e, delta) => {
-  if (dragging || Date.now() - lastDragEndAt < 500) return // 拖拽中/触控板手势尾部误滚，忽略
+// 诊断：渲染层回传精灵在窗口坐标系里的实际 rect（判断视觉漂移源）。
+let lastRectLog = null
+ipcMain.on('pet-rect', (_e, r) => {
+  if (!win) return
+  const [x, y] = win.getPosition()
+  const key = [y, r.t, r.b, spriteH].join(',')
+  if (key === lastRectLog) return
+  lastRectLog = key
+  try { fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: Date.now(), kind: 'rect', winY: y, spriteTop: r.t, spriteBot: r.b, spriteH, winH: win.getBounds().height }) + '\n') } catch { /* noop */ }
+})
+ipcMain.on('pet-wheel', (_e, delta) => {  if (dragging || Date.now() - lastDragEndAt < 500) return // 拖拽中/触控板手势尾部误滚，忽略
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()
   poll()

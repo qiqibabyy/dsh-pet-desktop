@@ -424,6 +424,8 @@ function updateShape() {
     push(spriteWrap, 2)
     push(bubbles.firstElementChild, 10)
     push(panelHost.firstElementChild, 10)
+    const sr = spriteWrap.getBoundingClientRect()
+    if (sr.height > 1) ipcRenderer.send('pet-rect', { t: Math.round(sr.top), b: Math.round(sr.bottom), l: Math.round(sr.left), rt: Math.round(sr.right), h: Math.round(sr.height) })
   }
   if (rects.length) ipcRenderer.send('pet-shape', rects)
 }
