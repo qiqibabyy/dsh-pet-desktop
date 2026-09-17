@@ -424,8 +424,6 @@ function updateShape() {
     push(spriteWrap, 2)
     push(bubbles.firstElementChild, 10)
     push(panelHost.firstElementChild, 10)
-    const sr = spriteWrap.getBoundingClientRect()
-    if (sr.height > 1) ipcRenderer.send('pet-rect', { t: Math.round(sr.top), b: Math.round(sr.bottom), l: Math.round(sr.left), rt: Math.round(sr.right), h: Math.round(sr.height) })
   }
   if (rects.length) ipcRenderer.send('pet-shape', rects)
 }
@@ -483,10 +481,9 @@ addEventListener('pointerup', () => endDrag(true))
 addEventListener('mouseup', () => endDrag(true))
 // 主进程判定触边钉死 → 本次手势结束（语义上等于松手）。
 ipcRenderer.on('pet-drag-force-end', () => endDrag(false))
-// 捕获丢失只记日志不结束手势：很多情况（贴边钳制、形状切换）下 Chromium 会
-// 提前丢捕获，但用户还按着键——由 buttons==0 / pointerup / 下次按下收尾。
-sprite.addEventListener('lostpointercapture', () => ipcRenderer.send('pet-rdrag', 'lost'))
-addEventListener('pointercancel', () => { ipcRenderer.send('pet-rdrag', 'cancel'); endDrag(false) })
+// 注意：不监听 lostpointercapture——本机设备上 Chromium 按下 ~70ms 即丢捕获，
+// 但用户还按着键；以 buttons==0 / pointerup / pointercancel 为准。
+addEventListener('pointercancel', () => endDrag(false))
 function setFeedback(fb) {
   feedback = fb
   clearTimeout(hideTimer)
