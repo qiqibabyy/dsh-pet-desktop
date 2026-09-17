@@ -255,7 +255,10 @@ function eatSlack(d, s) {
   if (!d || !s || Math.sign(d) === Math.sign(s)) return 0
   return Math.sign(d) * Math.min(Math.abs(d), Math.abs(s))
 }
-ipcMain.on('pet-drag-start', () => { slack = [0, 0] })
+ipcMain.on('pet-drag-start', () => {
+  slack = [0, 0]
+  try { fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: Date.now(), kind: 'rdrag', a: 'start' }) + '\n') } catch { /* noop */ }
+})
 ipcMain.on('pet-drag', (_e, dx, dy) => {
   if (!win) return
   if (!slack) slack = [0, 0]
@@ -268,12 +271,15 @@ ipcMain.on('pet-drag', (_e, dx, dy) => {
   slack[0] += rawX - x
   slack[1] += rawY - y
   if (x !== b.x || y !== b.y) {
-    tl('drag', [b.x, b.y], [x, y])
+    tl('drag', [b.x, b.y], [x, y, Math.round(slack[0]), Math.round(slack[1])])
     win.setPosition(x, y)
   }
   pushGeo(x, y, wa)
 })
 ipcMain.on('pet-drag-end', () => { slack = null; if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
+ipcMain.on('pet-rdrag', (_e, kind) => {
+  try { fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: Date.now(), kind: 'rdrag', a: kind }) + '\n') } catch { /* noop */ }
+})
 ipcMain.on('pet-wheel', (_e, delta) => {
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))
   saveSettings()

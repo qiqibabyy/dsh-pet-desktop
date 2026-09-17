@@ -472,14 +472,17 @@ sprite.addEventListener('pointerdown', (e) => {
 })
 addEventListener('pointermove', (e) => {
   if (!drag) return
+  if (e.buttons === 0) { endDrag(false); return } // 捕获中途死掉时这里是真相：键已松
   const dx = e.screenX - drag.x, dy = e.screenY - drag.y
   drag.moved += Math.abs(dx) + Math.abs(dy)
   if (dx || dy) { ipcRenderer.send('pet-drag', dx, dy); drag.x = e.screenX; drag.y = e.screenY }
 })
 addEventListener('pointerup', () => endDrag(true))
-// 捕获丢失（指针滑出窗口/系统抢走）→ 必须立刻结束手势，否则留下幽灵拖拽。
-sprite.addEventListener('lostpointercapture', () => endDrag(false))
-addEventListener('pointercancel', () => endDrag(false))
+addEventListener('mouseup', () => endDrag(true))
+// 捕获丢失只记日志不结束手势：很多情况（贴边钳制、形状切换）下 Chromium 会
+// 提前丢捕获，但用户还按着键——由 buttons==0 / pointerup / 下次按下收尾。
+sprite.addEventListener('lostpointercapture', () => ipcRenderer.send('pet-rdrag', 'lost'))
+addEventListener('pointercancel', () => { ipcRenderer.send('pet-rdrag', 'cancel'); endDrag(false) })
 function setFeedback(fb) {
   feedback = fb
   clearTimeout(hideTimer)
