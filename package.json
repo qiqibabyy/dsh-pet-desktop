@@ -21,10 +21,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/linxin666/dsh-pet-desktop.git"
+    "url": "git+https://github.com/qiqibabyy/dsh-pet-desktop.git"
   },
-  "bugs": "https://github.com/linxin666/dsh-pet-desktop/issues",
-  "homepage": "https://github.com/linxin666/dsh-pet-desktop#readme",
+  "bugs": "https://github.com/qiqibabyy/dsh-pet-desktop/issues",
+  "homepage": "https://github.com/qiqibabyy/dsh-pet-desktop#readme",
   "scripts": {
     "smoke": "node scripts/smoke.mjs"
   },
