@@ -8,7 +8,7 @@
 
 - 🖥️ **桌面常驻**：无边框、置顶、透明**智能穿透**可切换（开启后拖不动、摸不到、滚轮无效，唯独右键仍能唤出菜单关掉它，永不自锁）；右键菜单（收起/召唤、缩放、鼠标穿透、退出）；互动栏（名字/亲密度/喂食/改名）只在轻点她时出现，路过或悬停不打扰
 - 📌 **贴边拖拽**：光标 1:1 跟手 + 触边吸附——撞上屏幕边的那刻钉住，回拉鼠标不会把她带离（重新按住才走）。气泡与设置卡随边自动翻向：左右贴边时向内生长，顶贴边时降到脚下，任何位置都不会被屏幕裁掉
-- 🎬 **Codex 宠物格式原生支持**：自动发现 `~/.codex/pets`、`~/.dsh/pets` 与包内 `assets/pets`（`pet.json` + `spritesheet.webp`），9 条标准轨道（idle / running-right / running-left / waving / jumping / failed / waiting / running / review）+ 每宠物 `tracks/sequences` 覆盖
+- 🎬 **Codex 宠物格式原生支持**：宠物文件夹直接拷进 `~/.codex/pets` 即用，自动发现 `~/.dsh/pets` 与包内 `assets/pets`（`pet.json` + `spritesheet.webp`），9 条标准轨道（idle / running-right / running-left / waving / jumping / failed / waiting / running / review）+ 每宠物 `tracks/sequences` 覆盖
 - 💬 **活动气泡**：直接监听 harness 会话事件，投影为 waiting / thinking / tool / review / done / failed 六相位；389 条内置中文文案按 4s 轮转，工具碎碎念（「」小气泡）带 9s/5s 冷却与 8s 上屏时限；多会话气泡栈 + `+N` 角标
 - 💕 **亲密度系统**：摸头 +1（10s 冷却）、喂食 +5（消耗 1 小鱼干，30s 冷却）、完成对话 +1（按会话轮次幂等）；小鱼干每 30 轮 +1、每 5 小时 +1、上限 20；亲密度**永不衰减**
 - 🐋 **装扮**：内置小鲸鱼陪伴装饰层（随相位播放帧段），设置页可换/可关
@@ -44,6 +44,10 @@ Electron 运行时按以下顺序查找（任一命中即可）：
 4. 插件配置 `petDirs` 列出的额外目录
 
 `renderer: live2d / frames2d` 的宠物按设计跳过（本插件渲染 sprite2d 图集）。
+
+### 从 Codex 移植宠物
+
+**零转换直接拷**：把 Codex 的宠物文件夹（`pet.json` + 图集）整个放进 `~/.codex/pets/<id>/` 即被自动发现（`CODEX_HOME` 环境变量同样生效）。宠物定义兼容 Codex 两代 manifest——旧版扁平格式（hatch-pet）与 v2 `sprite2d` 块。换宠物不用碰命令行：harness 设置 →「桌面宠物」→ 形象分组，缩略图卡片点选，桌宠即时换装。
 
 ## 段位（亲密度点数）
 

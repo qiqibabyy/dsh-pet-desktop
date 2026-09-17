@@ -10,7 +10,7 @@ A **self-contained** [DSH](https://github.com/deepseek-ai) harness plugin: when 
 
 - 🖥️ **Desktop overlay**: frameless, always-on-top, transparent **smart click-through** — when on, she's inert to dragging/clicking/scroll and only a right-click still reaches her control menu (so you can never trap yourself); the info card (name/rank/feed/rename) appears only on a tap, not on hover
 - 📌 **Edge-aware dragging**: 1:1 pointer tracking with snap — the instant she hits a screen edge she sticks there (recycling the mouse can't drag her back off; a fresh grab moves her again). Bubbles and the settings card auto-flip near edges — grow inward at left/right, drop below her feet at the top — nothing ever clips off-screen
-- 🎬 **Native Codex pet format**: auto-discovers `~/.codex/pets`, `~/.dsh/pets` and bundled `assets/pets` (`pet.json` + `spritesheet.webp`); the 9 standard tracks (idle / running-right / running-left / waving / jumping / failed / waiting / running / review) with per-pet `tracks` / `sequences` overrides
+- 🎬 **Native Codex pet format**: drop Codex pet folders straight into `~/.codex/pets` — also auto-discovers `~/.dsh/pets` and bundled `assets/pets` (`pet.json` + `spritesheet.webp`); the 9 standard tracks (idle / running-right / running-left / waving / jumping / failed / waiting / running / review) with per-pet `tracks` / `sequences` overrides
 - 💬 **Live activity bubbles**: harness session events project onto six phases (waiting / thinking / tool / review / done / failed); 389 built-in zh chatter lines rotating every 4 s; tool "whispers" («…」) with 9 s / 5 s cooldowns and 8 s on-screen TTL; multi-session bubble stack with `+N` badge
 - 💕 **Affinity**: pet +1 (10 s cooldown), feed +5 (costs 1 treat, 30 s cooldown), completed turn +1 (idempotent per session turn); treats accrue +1 per 30 turns and +1 per 5 h, capped at 20; affinity **never decays**
 - 🐋 **Decoration**: bundled whale status ornament, phase-driven frame segments, switchable/off in settings
@@ -45,6 +45,10 @@ Format details: [`assets/pets/README.md`](assets/pets/README.md). Sources scanne
 4. extra directories from the `petDirs` plugin config
 
 Pets declaring `renderer: live2d / frames2d` are skipped by design — this plugin renders sprite2d atlases.
+
+### Porting pets from Codex
+
+**Drop them in as-is, zero conversion**: copy a Codex pet folder (`pet.json` + atlas) into `~/.codex/pets/<id>/` and it is discovered automatically (`CODEX_HOME` is honored). Both Codex manifest generations are understood — the legacy flat hatch-pet shape and v2 `sprite2d` blocks. No CLI needed to swap pets: harness settings → "Desktop Pet" → the appearance picker; click a thumbnail and the companion re-skins live.
 
 ## Ranks (affinity points)
 
