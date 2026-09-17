@@ -1,0 +1,7 @@
+{
+  "name": "dsh-desktop-pet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DSH 桌宠悬浮窗：把 harness 宠物(含 Codex 导入的 qban-girl)钉到桌面上，跟随 DSH 会话状态动画。",
+  "main": "main.cjs"
+}

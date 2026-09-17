@@ -1,0 +1,64 @@
+{
+  "name": "@linxin666/dsh-pet-desktop",
+  "version": "0.1.0",
+  "description": "A self-contained desktop pet plugin for DeepSeek Harness: Codex-style frame-animated pet living on your desktop, with its own affinity state machine, pet registry (Codex pet.json compatible), activity bubbles wired to harness sessions, decorations, and a settings-page card. No web pet required.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "codex-pet",
+    "cordis",
+    "electron"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linxin666/dsh-pet-desktop.git"
+  },
+  "bugs": "https://github.com/linxin666/dsh-pet-desktop/issues",
+  "homepage": "https://github.com/linxin666/dsh-pet-desktop#readme",
+  "scripts": {
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "src",
+    "assets",
+    "companion",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md",
+    "README.zh.md"
+  ],
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dependencies": {
+    "schemastery": "^3.18.0"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.5-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  }
+}

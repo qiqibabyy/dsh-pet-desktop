@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>dsh-pet</title>
+<style>
+/* 视口 = 悬浮窗（WIN_WIDTH × BUB_RESERVE+spriteH+PANEL_RESERVE）。
+   #float 复刻网页 .float：flex 列、居中收Wrap，精灵锚在底部预留带上方；
+   气泡/面板作为 absolute 子孙借用 flex 静态位居中 —— 与网页同一机制。 */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; }
+#float {
+  position: absolute; left: 50%; bottom: 178px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  user-select: none; -webkit-user-select: none; pointer-events: auto;
+}
+
+/* ===== 以下自 @linxin666/dsh-pet pet.module.css 原样移植 ===== */
+.sprite { image-rendering: auto; touch-action: none; contain: paint; cursor: grab; }
+.spriteWrap { position: relative; flex: 0 0 auto; }
+
+.bubble {
+  position: absolute; bottom: 100%; margin-bottom: 6px; white-space: nowrap;
+  padding: calc(4px * var(--pet-bubble-scale, 1)) calc(10px * var(--pet-bubble-scale, 1));
+  border-radius: 999px; font-size: calc(12px * var(--pet-bubble-scale, 1));
+  line-height: 1.4; color: #f4f7ff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  animation: pet-bubble-pop 2.6s ease-out forwards; pointer-events: none;
+}
+.bubblePet { background: rgba(77, 107, 254, 0.95); }
+.bubbleFeed { background: rgba(3, 105, 161, 0.95); }
+.bubbleStatus {
+  max-width: min(calc(280px * var(--pet-bubble-scale, 1)), calc(100vw - 24px));
+  overflow: hidden; text-overflow: ellipsis;
+  padding: calc(5px * var(--pet-bubble-scale, 1)) calc(12px * var(--pet-bubble-scale, 1));
+  background: linear-gradient(160deg, rgba(19, 28, 54, 0.9), rgba(7, 11, 26, 0.94));
+  border: 1px solid rgba(126, 152, 255, 0.45);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.35), inset 0 1px 0 rgba(226, 232, 255, 0.1), 0 0 12px rgba(77, 107, 254, 0.18);
+  backdrop-filter: blur(8px); letter-spacing: 0.02em; animation: pet-bubble-in 240ms ease-out;
+}
+.bubbleWhisper { letter-spacing: 0.03em; animation: pet-whisper-in 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.bubbleWhisper::before { content: '「'; margin-right: 2px; opacity: 0.7; }
+.bubbleWhisper::after { content: '」'; margin-left: 2px; opacity: 0.7; }
+.bubbleStack {
+  position: absolute; bottom: 100%;
+  display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; pointer-events: auto;
+}
+.bubbleAnchor { position: relative; display: inline-flex; }
+.bubbleMore {
+  position: absolute; top: -9px; right: -10px; z-index: 1; min-width: 18px; height: 18px; padding: 0 5px;
+  border: 1px solid rgba(126, 152, 255, 0.55); border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; line-height: 1; color: #eef2ff;
+  background: linear-gradient(160deg, rgba(74, 104, 245, 0.95), rgba(47, 68, 184, 0.95));
+  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.4); cursor: pointer; transition: filter 120ms ease;
+}
+.bubbleMore:hover { filter: brightness(1.15); }
+.bubbleStack .bubble { position: relative; bottom: auto; margin-bottom: 0; pointer-events: auto; }
+.bubbleClickable { cursor: pointer; font: inherit; text-align: center; appearance: none; transition: filter 120ms ease, box-shadow 120ms ease; }
+.bubbleClickable:hover { filter: brightness(1.12); }
+@keyframes pet-bubble-in { from { opacity: 0; transform: translateY(6px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes pet-whisper-in { 0% { opacity: 0; transform: translateY(8px) scale(0.9); } 60% { transform: translateY(-1px) scale(1.02); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes pet-panel-in { from { opacity: 0; transform: translateY(4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes pet-bubble-pop { 0% { opacity: 0; transform: translateY(6px) scale(0.85); } 15% { opacity: 1; transform: translateY(0) scale(1.05); } 25% { transform: translateY(0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px) scale(0.95); } }
+.panel {
+  position: absolute; top: 100%; margin-top: 8px;
+  background: linear-gradient(165deg, rgba(19, 28, 54, 0.95), rgba(7, 11, 26, 0.97));
+  border: 1px solid rgba(126, 152, 255, 0.3); border-radius: 12px; padding: 10px 12px;
+  color: #e6ebf8; font-size: 12px;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45), 0 0 0 1px rgba(77, 107, 254, 0.1), inset 0 1px 0 rgba(226, 232, 255, 0.08);
+  backdrop-filter: blur(10px); display: flex; flex-direction: column; gap: 7px; min-width: 148px;
+  animation: pet-panel-in 200ms cubic-bezier(0.22, 1, 0.36, 1); transform-origin: 50% 0; pointer-events: auto;
+}
+.panel::after { content: ''; position: absolute; bottom: 100%; left: 0; right: 0; height: 14px; }
+.rankRow { display: flex; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.nameCell { font-weight: 600; letter-spacing: 0.02em; background: linear-gradient(90deg, #a9c1ff, #6c8bff 60%, #4d6bfe); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.statRank { color: #9db4ff; font-weight: 600; }
+.statTreats { color: #7dd3fc; font-weight: 600; }
+.statPoints { color: #fcd34d; font-weight: 600; }
+.renameRow { display: flex; gap: 6px; align-items: center; }
+.nameInput {
+  flex: 1; min-width: 0; border: 1px solid rgba(126, 152, 255, 0.5); border-radius: 6px;
+  background: rgba(19, 28, 54, 0.9); color: #e6ebf8; font-size: 12px; padding: 3px 6px; outline: none;
+}
+.nameInput:focus { border-color: #4d6bfe; box-shadow: 0 0 0 2px rgba(77, 107, 254, 0.45); }
+.actions { display: flex; gap: 6px; }
+.action {
+  flex: 1; border: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600;
+  cursor: pointer; color: #fff; background: linear-gradient(180deg, #4a68f5, #3a55e0);
+  box-shadow: 0 2px 6px rgba(77, 107, 254, 0.3); transition: filter 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.action:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(77, 107, 254, 0.4); }
+.action:active { filter: brightness(0.94); transform: translateY(0); }
+.bubbleUsage {
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 128px;
+  max-width: min(280px, calc(100vw - 24px)); padding: 6px 12px; white-space: nowrap;
+  background: linear-gradient(160deg, rgba(19, 28, 54, 0.92), rgba(7, 11, 26, 0.95));
+  border: 1px solid rgba(126, 152, 255, 0.45);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.35), inset 0 1px 0 rgba(226, 232, 255, 0.1), 0 0 12px rgba(77, 107, 254, 0.18);
+  backdrop-filter: blur(8px); letter-spacing: 0.02em; animation: pet-usage-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bubbleUsageHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.bubbleUsageTitle { overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
+.bubbleUsageValue { font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.bubbleUsageNote { overflow: hidden; text-overflow: ellipsis; font-size: 10px; opacity: 0.55; }
+.bubbleUsageMeter { display: block; height: 4px; border-radius: 999px; background: rgba(226, 232, 255, 0.14); overflow: hidden; }
+.bubbleUsageMeterFill { display: block; height: 100%; border-radius: 999px; background: #6ee7b7; transition: width 300ms ease; }
+.bubbleUsageOk { border-color: rgba(126, 152, 255, 0.45); }
+.bubbleUsageWarn { border-color: rgba(251, 191, 36, 0.55); }
+.bubbleUsageWarn .bubbleUsageMeterFill { background: #fbbf24; }
+.bubbleUsageLow { border-color: rgba(248, 113, 113, 0.6); }
+.bubbleUsageLow .bubbleUsageMeterFill { background: #f87171; }
+@keyframes pet-usage-in { from { opacity: 0; transform: translateY(6px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.summon {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  border: 1px dashed rgba(126, 152, 255, 0.6); background: rgba(7, 11, 26, 0.75); color: #8ea6ff;
+  border-radius: 999px; padding: 2px 10px; font-size: 11px; cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.summon:hover { border-color: rgba(126, 152, 255, 0.95); color: #c3d3ff; background: rgba(7, 11, 26, 0.9); }
+</style>
+</head>
+<body>
+<div id="float">
+  <div id="bubbles"></div>
+  <div class="spriteWrap" id="spriteWrap"><div class="sprite" id="sprite" role="button"></div></div>
+  <div id="panelHost"></div>
+</div>
+<script>
+const { ipcRenderer } = require('electron')
+const $ = (id) => document.getElementById(id)
+const float = $('float'), sprite = $('sprite'), spriteWrap = $('spriteWrap'), bubbles = $('bubbles'), panelHost = $('panelHost')
+
+let def = null, snap = null, feedback = null, hideTimer = 0
+let hovered = false, renaming = false, nameDraft = '', peek = false, pinned = false, hiddenUI = false
+let imageReady = false, spriteH = 160, bubbleScale = 1, decoDataUrl = null
+const frame = { track: null, index: 0, elapsed: 0 }
+
+/* ---- 帧循环：与 PetSprite 相同（durations 驱动、非循环停末帧、缩放坐标） ---- */
+function trimTrack(t, n) {
+  const m = Math.max(1, Math.min(n, t.frames.length, t.durations.length))
+  return { frames: t.frames.slice(0, m), durations: t.durations.slice(0, m), loop: t.loop }
+}
+let lastPos = '', lastTs = performance.now()
+let seq = null // {list, seg, index, elapsed} —— sequences[phase] 多轨时间线
+function tickLoop() {
+  requestAnimationFrame(tickLoop)
+  const now = performance.now()
+  const delta = Math.max(0, now - lastTs); lastTs = now
+  if (!def || !imageReady || !snap || hiddenUI) return
+  const anim = snap.animation || 'idle'
+  // 与 PetSprite 相同：动画等于该 phase 的首轨且宠物声明了序列时，按段播放。
+  const seqFor = def.sequences && snap.phase ? def.sequences[snap.phase] : undefined
+  const inSequence = !!(seqFor && seqFor[0] === anim)
+  let segName = anim, trackRow = def.rowsIndex[anim] ?? 0
+  if (inSequence) {
+    if (!seq || seq.list !== seqFor) seq = { list: seqFor, seg: 0, index: 0, elapsed: 0 }
+    segName = seq.list[Math.min(seq.seg, seq.list.length - 1)]
+    trackRow = def.rowsIndex[segName] ?? 0
+    if (frame.track !== 'seq:' + segName) { frame.track = 'seq:' + segName; frame.index = 0; frame.elapsed = 0 }
+  } else {
+    seq = null
+    if (frame.track !== anim) { frame.track = anim; frame.index = 0; frame.elapsed = 0 }
+  }
+  const track = trimTrack(def.tracks[segName] || def.tracks.idle, def.rows[trackRow] ?? 99)
+  frame.elapsed += delta
+  const maxIndex = track.frames.length - 1
+  while (frame.elapsed >= (track.durations[frame.index] ?? 0) && frame.index < maxIndex) {
+    frame.elapsed -= track.durations[frame.index] ?? 0
+    frame.index += 1
+  }
+  if (frame.elapsed >= (track.durations[frame.index] ?? 0)) {
+    if (inSequence && seq.seg < seq.list.length - 1) {
+      // 序列：本段完整播一拍后进入下一段；末段循环轨继续循环。
+      seq.seg += 1; seq.index = 0; seq.elapsed = 0
+      frame.track = null // 强制下 tick 重置
+    } else if (track.loop) { frame.elapsed = 0; frame.index = 0 }
+    else frame.index = maxIndex
+  }
+  const scale = spriteH / def.cell.height
+  const x = -(track.frames[frame.index] ?? 0) * def.cell.width * scale
+  const y = -trackRow * def.cell.height * scale
+  const pos = x + 'px ' + y + 'px'
+  if (pos !== lastPos) { lastPos = pos; sprite.style.backgroundPosition = pos }
+}
+requestAnimationFrame(tickLoop)
+
+/* ---- 装饰纹样（StatusOrnament 同款排程） ---- */
+function makeOrnament(decoration, phase) {
+  const segment = decoration.phases[phase]
+  if (segment === undefined || segment === 'hide') return null
+  const scale = 18 / decoration.cell.height
+  const frameWidth = Math.round(decoration.cell.width * scale)
+  const span = document.createElement('span')
+  span.setAttribute('aria-hidden', 'true')
+  Object.assign(span.style, {
+    display: 'inline-block', width: frameWidth + 'px', height: '18px', marginRight: '6px',
+    verticalAlign: 'middle', flexShrink: '0', backgroundImage: decoDataUrl ? 'url(' + decoDataUrl + ')' : 'none',
+    backgroundSize: (decoration.columns * frameWidth) + 'px 18px', backgroundRepeat: 'no-repeat',
+  })
+  const from = segment.from, to = segment.to
+  span.style.backgroundPosition = (-from * frameWidth) + 'px 0px'
+  if (from === to) return span
+  let index = from, elapsed = 0, last = performance.now(), timer = 0
+  const tick = () => {
+    const now = performance.now(); elapsed += now - last; last = now
+    let duration = decoration.durations[index] ?? 120
+    if (elapsed >= duration) {
+      do {
+        elapsed -= duration
+        index = index < to ? index + 1 : (decoration.loop ? from : to)
+        duration = decoration.durations[index] ?? 120
+      } while (elapsed >= duration)
+      span.style.backgroundPosition = (-index * frameWidth) + 'px 0px'
+    }
+    if (!decoration.loop && index === to) return
+    timer = setTimeout(tick, Math.max(1, duration - elapsed))
+  }
+  timer = setTimeout(tick, 0)
+  return span
+}
+
+/* ---- 气泡栈（优先级与 DOM 结构照抄 PetSprite） ---- */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const announcementFresh = (a, now) => now - a.at < a.ttlMs
+
+function renderBubbles() {
+  bubbles.innerHTML = ''
+  if (!snap || hiddenUI) return
+  if (feedback !== null) {
+    const div = document.createElement('div')
+    div.className = 'bubble ' + (feedback.kind === 'feed' ? 'bubbleFeed' : 'bubblePet')
+    div.textContent = feedback.text
+    bubbles.appendChild(div)
+    return
+  }
+  const sessions = snap.sessions || []
+  const statusBubble = sessions.length === 0 ? snap.bubble : undefined
+  const usage = snap.announcement && announcementFresh(snap.announcement, Date.now()) ? snap.announcement : undefined
+  if (sessions.length === 0 && statusBubble === undefined && usage === undefined) return
+  const stack = document.createElement('div')
+  stack.className = 'bubbleStack'
+  stack.onpointerenter = () => { if (sessions.length > 1) { peek = true; renderBubbles(); updateShape() } }
+  stack.onpointerleave = () => { peek = false }
+  const open = peek || pinned
+  const collapsed = !open && sessions.length > 1
+  const visible = collapsed ? sessions.slice(0, 1) : sessions
+  visible.forEach((session, index) => {
+    const speaksWhisper = session.whisper !== undefined
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'bubble bubbleStatus bubbleClickable' + (speaksWhisper ? ' bubbleWhisper' : '')
+    btn.title = '点击跳转到对应会话'
+    if (index === 0 && !speaksWhisper && snap.decoration) {
+      const orn = makeOrnament(snap.decoration, snap.phase || 'idle')
+      if (orn) btn.appendChild(orn)
+    }
+    btn.appendChild(document.createTextNode(session.whisper ?? session.bubble ?? ''))
+    btn.onclick = () => ipcRenderer.send('pet-open-gui')
+    if (index !== 0 || sessions.length <= 1) { stack.appendChild(btn); return }
+    const anchor = document.createElement('span')
+    anchor.className = 'bubbleAnchor'
+    anchor.appendChild(btn)
+    const badge = document.createElement('button')
+    badge.type = 'button'
+    badge.textContent = open ? '×' : '+' + String(sessions.length - 1)
+    badge.className = 'bubbleMore'
+    badge.title = open ? '收起会话气泡' : '展开其余 ' + (sessions.length - 1) + ' 个会话的气泡'
+    badge.onclick = (e) => { e.stopPropagation(); pinned = !pinned; renderBubbles(); updateShape() }
+    anchor.appendChild(badge)
+    stack.appendChild(anchor)
+  })
+  if (sessions.length === 0 && statusBubble !== undefined) {
+    const div = document.createElement('div')
+    div.className = 'bubble bubbleStatus'
+    if (snap.decoration) { const orn = makeOrnament(snap.decoration, snap.phase || 'idle'); if (orn) div.appendChild(orn) }
+    div.appendChild(document.createTextNode(statusBubble))
+    stack.appendChild(div)
+  }
+  if (usage !== undefined) {
+    const tone = usage.tone === 'low' ? 'bubbleUsageLow' : usage.tone === 'warn' ? 'bubbleUsageWarn' : 'bubbleUsageOk'
+    const div = document.createElement('div')
+    div.className = 'bubble bubbleUsage ' + tone
+    let html = '<span class="bubbleUsageHead"><span class="bubbleUsageTitle">' + esc(usage.title) + '</span>'
+    if ((usage.kind === 'balance' || usage.kind === 'cost') && usage.amount !== undefined) html += '<span class="bubbleUsageValue">' + esc(usage.amount) + '</span>'
+    if (usage.kind === 'plan' && usage.percent !== undefined) html += '<span class="bubbleUsageValue">' + Math.round(usage.percent) + '%</span>'
+    html += '</span>'
+    if (usage.kind === 'plan' && usage.percent !== undefined) html += '<span class="bubbleUsageMeter"><span class="bubbleUsageMeterFill" style="width:' + Math.min(100, Math.max(0, usage.percent)) + '%"></span></span>'
+    if (usage.note !== undefined) html += '<span class="bubbleUsageNote">' + esc(usage.note) + '</span>'
+    div.innerHTML = html
+    stack.appendChild(div)
+  }
+  bubbles.appendChild(stack)
+}
+
+/* ---- 悬停面板（同款 DOM：两行数值 + 动作/改名行） ---- */
+function renderPanel() {
+  panelHost.innerHTML = ''
+  if (!hovered || !snap || hiddenUI || renaming === 'pending') return
+  const panel = document.createElement('div')
+  panel.className = 'panel'
+  panel.onpointerenter = () => clearTimeout(hideTimer)
+  const aff = snap.affinity || {}, treats = snap.treats || {}
+  const row1 = document.createElement('div'); row1.className = 'rankRow'
+  row1.innerHTML = '<span class="nameCell">' + esc(snap.name ?? snap.displayName ?? '') + '</span><span class="statRank">亲密度 ' + esc(aff.rank ?? '?') + '</span>'
+  const row2 = document.createElement('div'); row2.className = 'rankRow'
+  row2.innerHTML = '<span class="statTreats">小鱼干 ×' + (treats.stocked ?? 0) + '</span><span class="statPoints">' + (aff.points ?? 0) + ' 点</span>'
+  panel.append(row1, row2)
+  if (renaming === true) {
+    const rr = document.createElement('div'); rr.className = 'renameRow'
+    const input = document.createElement('input')
+    input.className = 'nameInput'; input.value = nameDraft; input.maxLength = 20; input.placeholder = '输入新名字'
+    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'action'; ok.textContent = '确定'
+    const commit = () => { const v = input.value.trim(); if (v) ipcRenderer.invoke('pet-call', '/api/desktop-pet/set-name', { name: v }); renaming = false; hovered = false; render() }
+    ok.onclick = commit
+    input.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.nativeEvent.isComposing) commit(); if (e.key === 'Escape') { renaming = false; render() } }
+    rr.append(input, ok); panel.appendChild(rr)
+    setTimeout(() => { input.focus(); input.select() }, 0)
+  } else {
+    const actions = document.createElement('div'); actions.className = 'actions'
+    const mk = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'action'; b.textContent = label; b.onclick = fn; return b }
+    actions.append(
+      mk('喂食', async () => {
+        const r = await ipcRenderer.invoke('pet-call', '/api/desktop-pet/interact', { kind: 'feed' })
+        if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'feed' })
+      }),
+      mk('改名', () => { nameDraft = snap.name ?? ''; renaming = true; clearTimeout(hideTimer); render() }),
+      mk('隐藏', () => { hovered = false; ipcRenderer.send('pet-self-hide') }),
+    )
+    panel.appendChild(actions)
+  }
+  panelHost.appendChild(panel)
+}
+
+function renderSprite() {
+  float.style.setProperty('--pet-bubble-scale', String(bubbleScale))
+  if (!def) return
+  const scale = spriteH / def.cell.height
+  spriteWrap.style.display = hiddenUI ? 'none' : ''
+  float.style.display = hiddenUI ? 'none' : ''
+  if (!imageReady) return
+  Object.assign(sprite.style, {
+    width: Math.round(def.cell.width * scale) + 'px',
+    height: spriteH + 'px',
+    backgroundImage: 'url(' + def.atlasDataUrl + ')',
+    backgroundSize: (def.cell.width * def.columns * scale) + 'px ' + (def.cell.height * (def.atlasRows || def.rows.length) * scale) + 'px',
+    backgroundRepeat: 'no-repeat',
+  })
+}
+
+function updateShape() {
+  const rects = []
+  const push = (el, pad) => {
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) return
+    rects.push({
+      x: Math.max(0, Math.floor(r.left - pad)), y: Math.max(0, Math.floor(r.top - pad)),
+      width: Math.ceil(r.width + pad * 2), height: Math.ceil(r.height + pad * 2),
+    })
+  }
+  if (hiddenUI) push($$('summon'), 6)
+  else {
+    push(spriteWrap, 2)
+    push(bubbles.firstElementChild, 10)
+    push(panelHost.firstElementChild, 10)
+  }
+  if (rects.length) ipcRenderer.send('pet-shape', rects)
+}
+const $$ = (id) => document.getElementById(id)
+
+function render() {
+  renderBubbles(); renderPanel(); renderSprite()
+  if (hiddenUI) ensurePill(); else removePill()
+  requestAnimationFrame(updateShape)
+}
+
+/* ---- 收起态：召唤小药丸（.summon 同款样式） ---- */
+let pill = null
+function ensurePill() {
+  if (pill) return
+  pill = document.createElement('button')
+  pill.id = 'summon'; pill.className = 'summon'; pill.textContent = '点我召唤桌宠'
+  pill.onclick = () => ipcRenderer.send('pet-summon')
+  document.body.appendChild(pill)
+}
+function removePill() { if (pill) { pill.remove(); pill = null } }
+
+/* ---- 交互：拖精灵=移窗；点击=摸一摸（反馈气泡）；滚轮缩放；右键菜单 ---- */
+let drag = null
+sprite.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return
+  sprite.setPointerCapture?.(e.pointerId)
+  drag = { x: e.screenX, y: e.screenY, moved: 0 }
+  sprite.style.cursor = 'grabbing'
+  hovered = false; renderPanel(); updateShape()
+  e.preventDefault()
+})
+addEventListener('pointermove', (e) => {
+  if (!drag) return
+  const dx = e.screenX - drag.x, dy = e.screenY - drag.y
+  drag.moved += Math.abs(dx) + Math.abs(dy)
+  if (dx || dy) { ipcRenderer.send('pet-drag', dx, dy); drag.x = e.screenX; drag.y = e.screenY }
+})
+addEventListener('pointerup', async () => {
+  if (!drag) return
+  sprite.style.cursor = 'grab'
+  if (drag.moved < 5) {
+    try {
+      const r = await ipcRenderer.invoke('pet-call', '/api/desktop-pet/interact', { kind: 'pet' })
+      if (r && r.reaction) setFeedback({ text: r.reaction, kind: 'pet' })
+    } catch { /* host 不在 */ }
+  } else {
+    ipcRenderer.send('pet-drag-end')
+  }
+  drag = null
+})
+function setFeedback(fb) {
+  feedback = fb
+  clearTimeout(hideTimer)
+  hideTimer = setTimeout(() => { feedback = null; renderBubbles(); updateShape() }, 2600)
+  renderBubbles()
+}
+spriteWrap.addEventListener('pointerenter', () => { clearTimeout(hideTimer); hovered = true; renderPanel(); updateShape() })
+addEventListener('pointerleave', () => {
+  const next = event.relatedTarget
+  if (next instanceof Node && (spriteWrap.contains(next) || panelHost.contains(next) || bubbles.contains(next))) return
+  clearTimeout(hideTimer)
+  hideTimer = setTimeout(() => { if (renaming !== true) { hovered = false; renderPanel(); updateShape() } }, 300)
+})
+addEventListener('wheel', (e) => { ipcRenderer.send('pet-wheel', e.deltaY); e.preventDefault() }, { passive: false })
+addEventListener('contextmenu', (e) => { e.preventDefault(); ipcRenderer.send('pet-menu') })
+addEventListener('resize', updateShape)
+
+/* ---- 主进程消息面 ---- */
+ipcRenderer.on('pet-def', (_e, d) => {
+  def = d; imageReady = false
+  const img = new Image()
+  img.onload = () => { imageReady = true; frame.track = null; render() }
+  img.onerror = () => { ipcRenderer.send('pet-debug', { atlasLoadFailed: true }) }
+  img.src = d.atlasDataUrl
+  document.title = d.displayName || d.id
+})
+ipcRenderer.on('pet-deco', (_e, d) => { decoDataUrl = d.dataUrl; renderBubbles(); updateShape() })
+let lastSig = ''
+ipcRenderer.on('pet-state', (_e, s) => {
+  spriteH = s.spriteH; bubbleScale = s.bubbleScale
+  const sig = JSON.stringify(s.snapshot)
+  snap = s.snapshot
+  if (sig !== lastSig) {
+    lastSig = sig
+    renderBubbles()
+    renderPanel()
+  }
+  renderSprite()
+  requestAnimationFrame(updateShape)
+})
+ipcRenderer.on('pet-hidden', (_e, v) => { hiddenUI = !!v; render() })
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && renaming === true) { renaming = false; render() } })
+window.onerror = (m, s, l) => { ipcRenderer.send('pet-debug', { err: String(m).slice(0, 200), at: s + ':' + l }) }
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# 运行时产物（勿提交）
+node_modules/
+electron.local
+.mount-marker
+.spawn-error
+companion/.pid
+companion/.quit-intent
+companion/window.json
+data/
+
+# 调研笔记（含本机路径，发布前检查）
+docs/PET-SPEC.md
+
+# 杂项
+*.log
+.DS_Store

@@ -1,0 +1,5 @@
+# dsh-pet-desktop bundle patch: inserts its plugin row into the web plugin roster.
+# Install: dsh plugin --profile web add link:<this-directory>
+- insert:
+    - id: pet-desktop
+      name: '@linxin666/dsh-pet-desktop'
