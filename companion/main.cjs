@@ -124,11 +124,10 @@ async function poll() {
       const oldH = spriteH
       spriteH = h
       if (win) {
-        const wa = screen.getPrimaryDisplay().workArea
         const [x, y] = win.getPosition()
-        const nh = windowHeightFor(h)
-        const ny = Math.max(wa.y, Math.min(y + (oldH === 0 ? 0 : oldH - h), wa.y + wa.height - nh))
-        win.setBounds({ x, y: ny, width: WIN_WIDTH, height: nh })
+        // 精灵底边锚定；越界交给 clampToScreen（按所在显示器）。
+        win.setBounds({ x, y: y + (oldH === 0 ? 0 : oldH - h), width: WIN_WIDTH, height: windowHeightFor(h) })
+        clampToScreen()
       }
     }
     win && win.webContents.send('pet-state', {
@@ -150,6 +149,17 @@ async function poll() {
 function applyTopmost() { if (win) win.setAlwaysOnTop(settings.topmost, 'screen-saver') }
 function applyClickThrough() { if (win) win.setIgnoreMouseEvents(!!settings.clickThrough, { forward: true }) }
 
+// 整窗收进「所在显示器」的工作区：气泡层在窗口内部，窗不越屏气泡就不可能被裁。
+// 用 getDisplayMatching 而非主屏，副屏用户拖过去不会被拽回来。
+function clampToScreen() {
+  if (!win) return
+  const b = win.getBounds()
+  const wa = screen.getDisplayMatching(b).workArea
+  const x = Math.max(wa.x, Math.min(b.x, wa.x + wa.width - b.width))
+  const y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - b.height))
+  if (x !== b.x || y !== b.y) win.setBounds({ ...b, x, y })
+}
+
 function buildMenu() {
   return Menu.buildFromTemplate([
     { label: settings.hidden ? '召唤桌宠' : '收起桌宠', click: () => { settings.hidden = !settings.hidden; saveSettings(); if (win) win.webContents.send('pet-hidden', settings.hidden) } },
@@ -168,10 +178,13 @@ function createWindow() {
   const wa = screen.getPrimaryDisplay().workArea
   spriteH = Math.max(64, Math.min(512, Math.round(160 * settings.zoom)))
   const h = windowHeightFor(spriteH)
-  const clamp = (p) => ({
-    x: Math.max(wa.x, Math.min(p.x, wa.x + wa.width - WIN_WIDTH)),
-    y: Math.max(wa.y, Math.min(p.y, wa.y + wa.height - h)),
-  })
+  const clamp = (p) => {
+    const wa = screen.getDisplayMatching({ x: p.x, y: p.y, width: WIN_WIDTH, height: h }).workArea
+    return {
+      x: Math.max(wa.x, Math.min(p.x, wa.x + wa.width - WIN_WIDTH)),
+      y: Math.max(wa.y, Math.min(p.y, wa.y + wa.height - h)),
+    }
+  }
   const onScreen = screen.getAllDisplays().some(d =>
     settings.pos && settings.pos.x >= d.bounds.x - 40 && settings.pos.x < d.bounds.x + d.bounds.width &&
     settings.pos.y >= d.bounds.y - 40 && settings.pos.y < d.bounds.y + d.bounds.height)
@@ -205,6 +218,7 @@ ipcMain.on('pet-drag', (_e, dx, dy) => {
   if (!win) return
   const [x, y] = win.getPosition()
   win.setPosition(x + Math.round(dx), y + Math.round(dy))
+  clampToScreen()
 })
 ipcMain.on('pet-drag-end', () => { if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
 ipcMain.on('pet-wheel', (_e, delta) => {
