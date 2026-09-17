@@ -79,6 +79,7 @@ let lastPetId = null
 let lastDecoId = null
 let spriteH = 0
 let cellRatio = 192 / 208 // 精灵绘制宽/高比，来自当前宠物 cell
+let dragging = false
 
 function bubbleScaleFor(display) {
   const size = Number.isFinite(display.size) ? display.size : BUBBLE_BASE_SIZE_PX
@@ -247,38 +248,34 @@ function createWindow() {
 }
 
 ipcMain.on('pet-menu', () => { if (win) buildMenu().popup({ window: win }) })
-// 拖拽 = 光标 1:1（按下点始终在精灵附近，指针捕获稳定）+ 贴边余量(slack)：
-// 窗口钉在边沿时把光标过冲计入 slack；回拉先消耗 slack——光标追平窗口前
-// 她纹丝不动，不存在"回抽一下就把她从屏边拽下来"的下沉。
-let slack = null
-function eatSlack(d, s) {
-  if (!d || !s || Math.sign(d) === Math.sign(s)) return 0
-  return Math.sign(d) * Math.min(Math.abs(d), Math.abs(s))
-}
-ipcMain.on('pet-drag-start', () => {
-  slack = [0, 0]
-  try { fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: Date.now(), kind: 'rdrag', a: 'start' }) + '\n') } catch { /* noop */ }
-})
+// 拖拽 = 光标 1:1 + 触边吸附(snap)：窗口被钳制顶回的那一刻本次手势即告结束
+// （渲染层收到 force-end 后收尾），之后光标随便怎么回收/甩动都和她无关——
+// 这是桌宠贴边的标准语义，触控板"拖一段回一段"的场景下不会发生任何回沉。
+ipcMain.on('pet-drag-start', () => { dragging = true })
 ipcMain.on('pet-drag', (_e, dx, dy) => {
-  if (!win) return
-  if (!slack) slack = [0, 0]
+  if (!win || !dragging) return
   const b = win.getBounds()
   const wa = screen.getDisplayMatching(b).workArea
-  const ex = eatSlack(dx, slack[0]); dx -= ex; slack[0] += ex
-  const ey = eatSlack(dy, slack[1]); dy -= ey; slack[1] += ey
   const rawX = b.x + Math.round(dx), rawY = b.y + Math.round(dy)
   const [x, y] = clampXY(rawX, rawY, wa)
-  slack[0] += rawX - x
-  slack[1] += rawY - y
-  if (x !== b.x || y !== b.y) {
-    tl('drag', [b.x, b.y], [x, y, Math.round(slack[0]), Math.round(slack[1])])
+  if (x !== rawX || y !== rawY) {
+    // 钳制生效 = 贴边钉死，手势当场结束并落盘。
+    dragging = false
+    settings.pos = { x, y }
+    saveSettings()
+    tl('snap', [b.x, b.y], [x, y])
     win.setPosition(x, y)
+    pushGeo(x, y, wa)
+    win.webContents.send('pet-drag-force-end')
+    return
   }
+  win.setPosition(x, y)
   pushGeo(x, y, wa)
 })
-ipcMain.on('pet-drag-end', () => { slack = null; if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() } })
-ipcMain.on('pet-rdrag', (_e, kind) => {
-  try { fs.appendFileSync(path.join(RUNTIME_DIR, 'edge-debug.log'), JSON.stringify({ t: Date.now(), kind: 'rdrag', a: kind }) + '\n') } catch { /* noop */ }
+ipcMain.on('pet-drag-end', () => {
+  if (!dragging) return
+  dragging = false
+  if (win) { const [x, y] = win.getPosition(); settings.pos = { x, y }; saveSettings() }
 })
 ipcMain.on('pet-wheel', (_e, delta) => {
   settings.zoom = Math.max(0.4, Math.min(3.2, settings.zoom * Math.pow(1.0015, -delta)))

@@ -479,6 +479,8 @@ addEventListener('pointermove', (e) => {
 })
 addEventListener('pointerup', () => endDrag(true))
 addEventListener('mouseup', () => endDrag(true))
+// 主进程判定触边钉死 → 本次手势结束（语义上等于松手）。
+ipcRenderer.on('pet-drag-force-end', () => endDrag(false))
 // 捕获丢失只记日志不结束手势：很多情况（贴边钳制、形状切换）下 Chromium 会
 // 提前丢捕获，但用户还按着键——由 buttons==0 / pointerup / 下次按下收尾。
 sprite.addEventListener('lostpointercapture', () => ipcRenderer.send('pet-rdrag', 'lost'))
